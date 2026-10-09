@@ -149,6 +149,7 @@ table.lifts input { max-width: 96px; }
 .card h3 .dot { width: 12px; height: 12px; }
 .kv { display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr); gap: 6px 16px; font-size: 14px; }
 .kv dt { color: var(--muted); }
+.kv.left dd { text-align: left; }
 .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; overflow-wrap: anywhere; }
 .big { font: 700 34px/1 var(--f-display); }
 .big small { font: 500 13px var(--f-mono); color: var(--muted); margin-left: 6px; }
@@ -311,10 +312,15 @@ const SECTIONS = [
       { id: "mobility", label: "Which of these can you do comfortably?", type: "multi", options: ["Touch toes with straight legs", "Squat to parallel with heels down", "Arms fully overhead without arching", "Balance on one leg for 30 s each side", "None of these"] }
     ] },
 
-  { id: "training", title: "Training: now & before", intro: "What you do now, what you've done before, and how your body handles training. Lift numbers can be rough; a recent set you're sure of beats a lifetime best.",
-    req: ["train_age", "train_now"],
+  { id: "training", title: "Training: now & before", intro: "Your training age decides the type of program you start on, so the first questions matter most. Lift numbers can be rough; a recent set you're sure of beats a lifetime best.",
+    req: ["train_age", "layoff", "train_now"],
     fields: [
-      { id: "train_age", label: "How long have you trained consistently?", type: "chips", options: ["Never consistently", "Under 6 months", "6–12 months", "1–2 years", "2–5 years", "5+ years"] },
+      { id: "train_age", label: "Training age: years of structured resistance training", help: "Count only time spent following a program and progressing the weights, 2+ sessions a week. Leave out long breaks.", type: "chips", options: ["None yet", "Under 6 months", "6–12 months", "1–2 years", "2–4 years", "4–7 years", "7+ years"] },
+      { id: "layoff", label: "When did your last stretch of 3+ months of consistent training end?", type: "chips", options: ["I'm in one now", "Under 3 months ago", "3–12 months ago", "1–3 years ago", "3+ years ago", "Never had one"] },
+      { id: "ta_type", label: "What made up most of those years?", type: "multi", options: ["Bodybuilding / hypertrophy", "Powerlifting / strength", "Olympic weightlifting", "CrossFit / conditioning", "Sport strength & conditioning", "Machines / circuit classes", "Bodyweight / calisthenics"] },
+      { id: "coached", label: "How was your training programmed?", type: "chips", options: ["Coached in person", "Online coach", "Written programs or apps", "Mostly made it up as I went"] },
+      { id: "technique", label: "Lifts you can do confidently with good technique", type: "multi", options: ["Squat", "Deadlift / hinge", "Bench press", "Overhead press", "Chin-up", "Split squat / lunge", "Olympic lifts (clean, snatch)", "None yet"] },
+      { id: "methods", label: "Training methods you've used before", type: "multi", options: ["Prescribed tempo (e.g. 3-1-1-0)", "Antagonist supersets (A1/A2)", "Accumulation / intensification phases", "Wave loading", "Cluster sets", "Drop sets", "German Volume Training", "None / not sure"] },
       { id: "train_now", label: "Training right now", type: "chips", options: ["Not training", "1–2 days/week", "3–4 days/week", "5+ days/week"] },
       { id: "current_routine", label: "Describe your current week of training", help: "Split, main exercises, cardio. Paste from your app if that's easier.", type: "textarea" },
       { id: "sets_now", label: "Roughly how many hard sets per muscle group per week?", type: "chips", options: ["Under 6", "6–10", "10–15", "15–20", "20+", "No idea"] },
@@ -545,7 +551,7 @@ document.addEventListener("click", e => {
     const id = chip.dataset.chip, v = chip.dataset.v;
     if (chip.dataset.multi === "1") {
       const arr = new Set(data[id] || []);
-      const exclusive = /^(None|None of these|None yet|No issues|No dips)$/;
+      const exclusive = /^(None|None of these|None yet|No issues|No dips|None \/ not sure)$/;
       if (arr.has(v)) arr.delete(v); else {
         if (exclusive.test(v)) arr.clear(); else [...arr].forEach(a => exclusive.test(a) && arr.delete(a));
         arr.add(v);
@@ -623,17 +629,40 @@ function calc(d) {
   const useObs = blend > 0;
   const tdee = blend ? blend * tdeeObs + (1 - blend) * (tdeeEst || 0) : tdeeEst;
 
-  // Training level: the lower of experience and strength
-  const ageIdx = { "Never consistently": 0, "Under 6 months": 0, "6–12 months": 0, "1–2 years": 1, "2–5 years": 1, "5+ years": 2 }[d.train_age];
+  // Training age → program tier (0 Novice, 1 Developing, 2 Intermediate, 3 Advanced)
+  const TIERS = ["Novice", "Developing", "Intermediate", "Advanced"];
+  const rawTier = { "None yet": 0, "Under 6 months": 0, "6–12 months": 0, "1–2 years": 1, "2–4 years": 2, "4–7 years": 3, "7+ years": 3 }[d.train_age];
+  const taNotes = [];
+  let tier = rawTier ?? null;
+  if (tier != null) {
+    const drop = { "1–3 years ago": 1, "3+ years ago": 2 }[d.layoff] || 0;
+    if (drop && tier > 0) { tier = Math.max(0, tier - drop); taNotes.push(`Detrained (${d.layoff.replace(" ago", "")} off): start ${drop} tier lower, move up fast as strength returns.`); }
+    if (d.coached === "Mostly made it up as I went" && tier > 1) { tier--; taNotes.push("Years were unstructured; real training age is likely lower than stated."); }
+  }
+  const ageIdx = rawTier == null ? undefined : [0, 1, 1, 2][rawTier];
   const fem = d.sex === "Female" ? 0.7 : 1;
   const TH = { squat: [1.25, 1.75], bench: [0.9, 1.3], dead: [1.5, 2.2] };
   const lifts = {}; LIFTS.forEach(([k]) => lifts[k] = e1rm(k, d));
   const bw = num(d.wt);
   const strScores = Object.entries(TH).filter(([k]) => lifts[k] && bw).map(([k, [i, a]]) => { const r = lifts[k] / bw; return r >= a * fem ? 2 : r >= i * fem ? 1 : 0; });
   const strIdx = strScores.length ? Math.round(strScores.reduce((a, b) => a + b, 0) / strScores.length) : null;
-  let level = ageIdx ?? null;
-  if (level != null && strIdx != null) level = Math.min(level, strIdx);
+  // Strength caps the tier: below beginner standards → at most Developing, below advanced → at most Intermediate
+  if (tier != null && strIdx != null && tier > strIdx + 1) { tier = strIdx + 1; taNotes.push("Strength relative to body weight is behind the stated training age; programmed one tier lower."); }
+  const tech = (d.technique || []).filter(x => x !== "None yet");
+  if (tier != null && tier >= 2 && tech.length < 3) taNotes.push("Few lifts done confidently: spend phase 1 on technique for the main patterns.");
+  const level = tier == null ? null : [0, 1, 1, 2][tier];
   const LEVELS = ["Beginner", "Intermediate", "Advanced"];
+  const PROGRAM = [
+    { phase: "General preparation (accumulation)", reps: "10–15", tempo: "3-1-1-0 or 4-0-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: "every 6–8 workouts",
+      structure: "Straight sets or simple A1/A2 antagonist pairs, 5–6 exercises", methods: "Dumbbells, cables and unilateral work; learn the main patterns; fix structural imbalances first" },
+    { phase: "Alternate accumulation and intensification every 2–3 weeks", reps: "Accumulation 8–12 · intensification 5–8", tempo: "3-1-1-0 / 3-0-1-0", sets: "3–4 per exercise", rest: "75–120 s", change: "every 6 workouts",
+      structure: "A1/A2 antagonist pairs, 4–6 exercises", methods: "Add barbell lifts as technique allows; tempo stays strict" },
+    { phase: "Alternate accumulation and intensification every 2–3 weeks", reps: "Accumulation 6–10 · intensification 3–6", tempo: "3-0-1-0 / 2-0-X-0 on heavy work", sets: "4–5 per exercise", rest: "90–180 s", change: "every 4–6 workouts",
+      structure: "A1/A2 pairs; heavy lift first, then assistance", methods: "Wave loading, post-fatigue supersets, mechanical drop sets" },
+    { phase: "Intensification-weighted blocks, short accumulation phases", reps: "Intensification 1–5 · accumulation 6–8", tempo: "Controlled eccentric, explosive concentric on heavy work", sets: "5–8 per main lift", rest: "2–4 min on main lifts", change: "every 3–4 workouts",
+      structure: "Fewer exercises, more sets; specialisation blocks for lagging areas", methods: "Wave loading, cluster sets, 1-6 contrast, specialisation" }
+  ];
+  const program = tier == null ? null : PROGRAM[tier];
 
   // Recovery capacity
   const parts = [];
@@ -646,15 +675,6 @@ function calc(d) {
   const so = { "Rarely sore": 0.9, "Under a day": 1, "1–2 days": 0.75, "3+ days": 0.4 }[d.soreness]; if (so != null) parts.push(so);
   const recovery = parts.length >= 3 ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length * 100) : null;
 
-  // Starting volume near the low end of productive volume, then add sets across the block
-  let vol = null;
-  if (level != null) {
-    let base = [6, 8, 10][level];
-    if (recovery != null) base += recovery < 50 ? -2 : recovery >= 75 ? 2 : 0;
-    if (d.joint_ache === "Often") base -= 2;
-    const len = d.session_len; if (len === "30–45 min") base = Math.min(base, 8);
-    vol = Math.max(4, base);
-  }
   const days = num(d.days);
   const SPLITS = { 2: "Full body × 2", 3: "Full body × 3", 4: "Upper / Lower × 2", 5: "Upper / Lower + Push / Pull / Legs", 6: "Push / Pull / Legs × 2" };
   const split = days ? SPLITS[days] : null;
@@ -721,8 +741,8 @@ function calc(d) {
   if ((d.will_track || []).includes("Daily morning weight")) habits.push("Weigh in every morning; judge progress on the weekly average trend, not single days.");
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
-  return { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, levelName: level != null ? LEVELS[level] : null, ageIdx, strIdx,
-    lifts, recovery, vol, split, days, phase, ratePct, rateKg, target, macros, RATIOS, flags, habits: habits.slice(0, 4), fromKg, imp };
+  return { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
+    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, RATIOS, flags, habits: habits.slice(0, 4), fromKg, imp };
 }
 
 /* ---------- Coach report ---------- */
@@ -744,12 +764,9 @@ function renderReport() {
     return;
   }
   const c = calc(data), u = wu(data);
-  const lvlTxt = c.levelName ? c.levelName : "Not enough info";
+  const lvlTxt = c.tierName ? c.tierName : "Not enough info";
   const rec = c.recovery;
   const recColor = rec == null ? "var(--muted)" : rec < 50 ? "var(--crit)" : rec < 70 ? "var(--warn)" : "var(--ok)";
-  const rir = c.level === 0 ? "Week 1 at 3 reps in reserve, ease to 2 by the last week. Technique and consistency first." : "Week 1 at 3 reps in reserve, down to 0–1 by the last hard week, then deload.";
-  const setsNow = data.sets_now && !["No idea"].includes(data.sets_now) ? data.sets_now : null;
-  const setsNote = c.vol && setsNow && ["15–20", "20+"].includes(setsNow) && c.vol <= 12 ? `Currently doing ${setsNow} sets. Drop to the start point and only add sets when performance stalls.` : setsNow ? `Currently doing ${setsNow} hard sets per muscle each week.` : "";
   const goalLine = [data.goal_primary, ...(data.goal_secondary || []).filter(x => x !== data.goal_primary)].filter(Boolean).join(" · ");
   const rateTxt = c.rateKg ? `${c.rateKg > 0 ? "+" : ""}${fmt(c.fromKg(c.rateKg), 2)} ${u}/week (${c.ratePct > 0 ? "+" : ""}${c.ratePct}% of body weight)` : "Hold weight steady";
 
@@ -770,18 +787,23 @@ function renderReport() {
     <div class="card"><h3>Flags</h3><div class="flags">${c.flags.map(([s, t]) => `<div class="flag ${s}"><span class="pill">${s === "crit" ? "Act" : s === "warn" ? "Watch" : "Clear"}</span><span>${esc(t)}</span></div>`).join("")}</div></div>
 
     <div class="rep-grid">
-      <div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Training start</h3>
-        <div class="big">${lvlTxt}${c.ageIdx != null && c.strIdx != null && c.ageIdx !== c.strIdx ? `<small>experience ${["beginner", "intermediate", "advanced"][c.ageIdx]}, strength ${["beginner", "intermediate", "advanced"][c.strIdx]}</small>` : ""}</div>
-        <dl class="kv">
-          <dt>Split</dt><dd>${esc(c.split || "–")}</dd>
-          <dt>Session length</dt><dd>${esc(data.session_len || "–")}</dd>
-          <dt>Start volume</dt><dd>${c.vol ? `${c.vol}–${c.vol + 2} sets / muscle / wk` : "–"}</dd>
-          <dt>Progression</dt><dd>+1–2 sets / wk if recovered</dd>
-          <dt>Block length</dt><dd>${c.level === 0 ? "6–8 wk" : "4–6 wk + deload"}</dd>
-          <dt>Equipment</dt><dd>${esc(data.equipment || "–")}</dd>
-        </dl>
-        <ul class="plain"><li>${rir}</li>${setsNote ? `<li>${esc(setsNote)}</li>` : ""}<li>Hit each muscle 2× a week. Start every muscle near the low end and add sets only where it recovers by the next session (low soreness, performance up).</li>
-        ${(data.lagging || []).length ? `<li>Priority muscles: ${esc(data.lagging.join(", "))}. Train first in the session, extra 2–4 sets.</li>` : ""}</ul>
+      <div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Training age & program type</h3>
+        <div class="big">${lvlTxt}<small>${esc(data.train_age || "training age not given")}</small></div>
+        ${c.program ? `<dl class="kv left">
+          <dt>Phase 1</dt><dd>${esc(c.program.phase)}</dd>
+          <dt>Reps</dt><dd>${esc(c.program.reps)}</dd>
+          <dt>Tempo</dt><dd>${esc(c.program.tempo)}</dd>
+          <dt>Sets</dt><dd>${esc(c.program.sets)}</dd>
+          <dt>Rest</dt><dd>${esc(c.program.rest)}</dd>
+          <dt>Change exercises</dt><dd>${esc(c.program.change)}</dd>
+          <dt>Structure</dt><dd>${esc(c.program.structure)}</dd>
+          <dt>Split</dt><dd>${esc(c.split || "–")}${data.session_len ? " · " + esc(data.session_len) : ""}</dd>
+        </dl>` : ""}
+        <ul class="plain">${c.program ? `<li>Methods: ${esc(c.program.methods)}.</li>` : ""}
+          ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
+          ${(data.lagging || []).length ? `<li>Priority areas: ${esc(data.lagging.join(", "))}. Train first in the session.</li>` : ""}
+          <li>Background: ${esc([(data.ta_type || []).join(", "), data.coached, data.layoff && "last consistent block: " + data.layoff.toLowerCase()].filter(Boolean).join(" · ") || "–")}.</li>
+          <li>Confident lifts: ${esc(c.tech.join(", ") || "none")}. Methods used: ${esc((data.methods || []).join(", ") || "–")}.</li></ul>
       </div>
 
       <div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Energy & macros</h3>
@@ -873,9 +895,10 @@ function reportText() {
   L.push(`STARTING POINT ASSESSMENT — ${data.name || "Unnamed client"}`, new Date().toDateString(), "");
   if (isExample) L.push("(EXAMPLE CLIENT)", "");
   L.push("FLAGS"); c.flags.forEach(([s, t]) => L.push(`- [${s === "crit" ? "ACT" : s === "warn" ? "WATCH" : "CLEAR"}] ${t}`));
-  L.push("", "TRAINING START",
-    `- Level: ${c.levelName || "–"}`, `- Split: ${c.split || "–"}`, `- Start volume: ${c.vol ? `${c.vol}–${c.vol + 2} hard sets per muscle per week, +1–2 sets/week if recovered` : "–"}`,
-    `- Effort: ${c.level === 0 ? "3 RIR easing to 2 RIR" : "3 RIR down to 0–1 RIR, then deload"}`);
+  L.push("", "TRAINING AGE & PROGRAM TYPE",
+    `- Training age: ${data.train_age || "–"} → ${c.tierName || "–"}`, `- Split: ${c.split || "–"}`,
+    ...(c.program ? [`- Phase 1: ${c.program.phase}`, `- Reps ${c.program.reps} · tempo ${c.program.tempo} · ${c.program.sets} · rest ${c.program.rest}`, `- Change exercises ${c.program.change}; ${c.program.structure}`, `- Methods: ${c.program.methods}`] : []),
+    ...c.taNotes.map(n => "- " + n));
   L.push("", "ENERGY & MACROS",
     `- Target: ${c.target ? fmt(r50(c.target)) + " kcal/day" : "–"} (${c.phase})`,
     `- Expenditure: ${c.tdee ? fmt(r50(c.tdee)) + " kcal" : "–"} (${c.blend === 1 ? "from intake + weight trend" : c.blend ? "blend of intake + trend and equation" : "equation estimate"})`,
@@ -941,7 +964,7 @@ const EXAMPLE = {
   inj_shoulder: "Past", inj_shoulder_side: "Right", inj_shoulder_note: "Rotator cuff strain 2021, fine now. Wide-grip bench bothers it.",
   inj_lowback: "Current", inj_lowback_side: "Centre", inj_lowback_pain: "3", inj_lowback_note: "Tight after long days sitting and after heavy deadlifts.",
   pain_moves: ["Hinging / deadlifts", "Long periods of sitting"], physio: "No", mobility: ["Squat to parallel with heels down", "Balance on one leg for 30 s each side"],
-  train_age: "2–5 years", train_now: "3–4 days/week", current_routine: "3 days full body when I can: squat or deadlift, bench, rows, curls. Usually 45 min.",
+  train_age: "2–4 years", layoff: "I'm in one now", ta_type: ["Bodybuilding / hypertrophy", "Powerlifting / strength"], coached: "Written programs or apps", technique: ["Squat", "Deadlift / hinge", "Bench press", "Chin-up"], methods: ["Drop sets"], train_now: "3–4 days/week", current_routine: "3 days full body when I can: squat or deadlift, bench, rows, curls. Usually 45 min.",
   sets_now: "6–10", rir: "2–3 reps left", logs: "Sometimes",
   lift_squat_w: "245", lift_squat_r: "5", lift_bench_w: "185", lift_bench_r: "5", lift_dead_w: "295", lift_dead_r: "3", lift_ohp_w: "105", lift_ohp_r: "5", lift_chin_w: "0", lift_chin_r: "6", pullups: "6",
   cardio: "1–2 times", cardio_type: "Pickup basketball on Sundays", sports: "High school basketball and track.",

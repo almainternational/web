@@ -128,6 +128,9 @@ table.lifts th { text-align: left; font: 500 11px var(--f-mono); text-transform:
 table.lifts td { padding: 6px 10px 6px 0; }
 table.lifts td:first-child { font-weight: 500; padding-right: 18px; white-space: nowrap; }
 table.lifts input { max-width: 96px; }
+table.sb { min-width: 720px; width: 100%; }
+table.sb td { vertical-align: top; padding-block: 8px; }
+table.sb tr.sb-group th { padding-top: 14px; color: var(--ink); border-bottom: 1px solid var(--line); }
 .e1rm { font-family: var(--f-mono); color: var(--muted); font-size: 13px; white-space: nowrap; }
 
 .nav-btns { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 20px; }
@@ -223,6 +226,25 @@ ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column;
 <script>
 /* ---------- Coach settings: fill these in before sending the page to clients ---------- */
 const COACH = { name: "", email: "" };
+
+/* Structural balance targets (Poliquin-style). Each lift is a % of its base lift's 1RM:
+   upper body against the close-grip bench press, lower body against the back squat.
+   Published figures vary between sources; edit "pct" to match your own standards.
+   mode "1rm": enter any heavy set (1–10 reps) and it is converted to an estimated 1RM.
+   mode "rm":  enter the weight for the stated rep max; it is compared directly. */
+const STRUCTURAL_BALANCE = [
+  { k: "cgb", name: "Close-grip bench press", test: "1RM · grip just inside shoulder width", base: true, group: "Upper body" },
+  { k: "incline", name: "Incline barbell bench press", test: "1RM", pct: 91, of: "cgb", fix: "upper chest and front delts" },
+  { k: "dip", name: "Parallel bar dip", test: "1RM · body weight + added", pct: 117, of: "cgb", bw: true, fix: "triceps and lower chest" },
+  { k: "chin", name: "Supinated chin-up", test: "1RM · body weight + added", pct: 87, of: "cgb", bw: true, fix: "lats and elbow flexors" },
+  { k: "dbpress", name: "1-arm seated dumbbell press", test: "6RM · per arm", pct: 30, of: "cgb", mode: "rm", fix: "shoulders, one side at a time" },
+  { k: "triext", name: "Lying triceps extension", test: "1RM", pct: 40, of: "cgb", fix: "triceps (lockout)" },
+  { k: "er", name: "1-arm DB external rotation, elbow on knee", test: "8RM · tempo 4-0-1-0 · per arm", pct: 9.8, of: "cgb", mode: "rm", fix: "rotator cuff external rotators: train these first and hold back max pressing" },
+  { k: "bsq", name: "Back squat", test: "1RM · full depth", base: true, group: "Lower body" },
+  { k: "fsq", name: "Front squat", test: "1RM · full depth", pct: 85, of: "bsq", fix: "quads and upper back posture" },
+  { k: "dl", name: "Deadlift", test: "1RM", pct: 120, of: "bsq", fix: "posterior chain (hamstrings, glutes, back)" },
+  { k: "pc", name: "Power clean", test: "1RM", pct: 68, of: "bsq", fix: "power and pulling technique" }
+];
 
 /* ---------- Questionnaire ---------- */
 const IMPERIAL = "Imperial (lb, ft/in)", METRIC = "Metric (kg, cm)";
@@ -578,7 +600,7 @@ document.addEventListener("input", e => {
 $("#panel").addEventListener("submit", e => e.preventDefault());
 function changed(fromTyping) {
   if (isExample) { isExample = false; }
-  save(); updateVisibility(); updateE1rm(); renderBar();
+  save(); updateVisibility(); updateE1rm(); renderBar(); updateSB();
   if (!fromTyping) renderSteps(); else document.querySelectorAll("#steps .tick").forEach((t, i) => t.textContent = complete(i) ? "✓" : "");
 }
 let clearArmed = false;
@@ -601,6 +623,32 @@ function e1rm(k, d) {
 }
 const pct = (a, b) => (a != null && b) ? a / b : null;
 const r50 = x => Math.round(x / 50) * 50;
+
+// Structural balance: tested values first, the client's self-reported lifts as a fallback
+function structuralBalance(d, lifts) {
+  const bw = num(d.wt) || 0, rows = {};
+  STRUCTURAL_BALANCE.forEach(t => {
+    const w = num(d["sb_" + t.k + "_w"]), r = num(d["sb_" + t.k + "_r"]);
+    let val = null, src = null;
+    if (w != null && (t.mode === "rm" || (r && r >= 1 && r <= 10))) {
+      const load = t.bw ? bw + w : w;
+      val = t.mode === "rm" ? load : (r === 1 ? load : load * (1 + r / 30)); src = "tested";
+    } else {
+      const fb = { cgb: lifts.bench ? lifts.bench * 0.87 : null, chin: lifts.chin, bsq: lifts.squat, fsq: lifts.fsquat, dl: lifts.dead }[t.k];
+      if (fb) { val = fb; src = t.k === "cgb" ? "est. from bench × 0.87" : "client-reported"; }
+    }
+    rows[t.k] = { ...t, val, src };
+  });
+  Object.values(rows).forEach(row => {
+    if (row.base) return;
+    const base = rows[row.of];
+    row.target = base.val ? base.val * row.pct / 100 : null;
+    row.ratio = row.val != null && row.target ? row.val / row.target : null;
+    row.status = row.ratio == null ? null : row.ratio >= 0.95 ? "ok" : row.ratio >= 0.85 ? "warn" : "crit";
+  });
+  const weak = Object.values(rows).filter(r => r.status && r.status !== "ok").sort((a, b) => a.ratio - b.ratio);
+  return { rows, weak, tested: Object.values(rows).some(r => r.src === "tested") };
+}
 
 function calc(d) {
   const imp = isImp(d), toKg = x => x == null ? null : imp ? x * 0.45359237 : x, fromKg = x => imp ? x / 0.45359237 : x;
@@ -702,13 +750,7 @@ function calc(d) {
     macros = { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2) };
   }
 
-  // Structural balance (reference ratios between lifts)
-  const RATIOS = [
-    ["Overhead press ÷ bench", pct(lifts.ohp, lifts.bench), 0.6, 0.7],
-    ["Chin-up (incl. body weight) ÷ bench", pct(lifts.chin, lifts.bench), 0.95, 1.2],
-    ["Front squat ÷ back squat", pct(lifts.fsquat, lifts.squat), 0.8, 0.9],
-    ["Back squat ÷ deadlift", pct(lifts.squat, lifts.dead), 0.8, 0.9]
-  ].filter(r => r[1] != null);
+  const sb = structuralBalance(d, lifts);
 
   // Flags
   const flags = [];
@@ -742,7 +784,7 @@ function calc(d) {
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
   return { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
-    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, RATIOS, flags, habits: habits.slice(0, 4), fromKg, imp };
+    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, sb, flags, habits: habits.slice(0, 4), fromKg, imp };
 }
 
 /* ---------- Coach report ---------- */
@@ -801,7 +843,8 @@ function renderReport() {
         </dl>` : ""}
         <ul class="plain">${c.program ? `<li>Methods: ${esc(c.program.methods)}.</li>` : ""}
           ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
-          ${(data.lagging || []).length ? `<li>Priority areas: ${esc(data.lagging.join(", "))}. Train first in the session.</li>` : ""}
+          ${c.sb.weak.length ? `<li><b>Weak links from structural balance:</b> ${esc(c.sb.weak.slice(0, 3).map(r => r.fix.split(":")[0]).join("; "))}. Fix these in phase 1 before pushing the base lifts.</li>` : ""}
+          ${(data.lagging || []).length ? `<li>Client wants to bring up: ${esc(data.lagging.join(", "))}.</li>` : ""}
           <li>Background: ${esc([(data.ta_type || []).join(", "), data.coached, data.layoff && "last consistent block: " + data.layoff.toLowerCase()].filter(Boolean).join(" · ") || "–")}.</li>
           <li>Confident lifts: ${esc(c.tech.join(", ") || "none")}. Methods used: ${esc((data.methods || []).join(", ") || "–")}.</li></ul>
       </div>
@@ -836,10 +879,9 @@ function renderReport() {
         <ul class="plain"><li>${rec == null ? "Needs the sleep, stress and energy answers." : rec < 50 ? "Low. Start below normal volume, keep the deficit small, and fix sleep and stress before pushing training." : rec < 70 ? "Moderate. Standard start; watch sleep and soreness week to week." : "Good. Can start at the upper end and progress normally."}</li></ul>
       </div>
 
-      <div class="card"><h3><span class="dot" style="background:var(--p-green)"></span>Strength & balance</h3>
+      <div class="card"><h3><span class="dot" style="background:var(--p-green)"></span>Reported strength</h3>
         <div class="ratio">${LIFTS.filter(([k]) => c.lifts[k]).map(([k, n]) => `<span>${n.replace(" (added weight)", "")}</span><span>${fmt(c.lifts[k])} ${u}</span><span class="tag muted">${data.wt ? fmt(c.lifts[k] / num(data.wt), 2) + "× BW" : ""}</span>`).join("") || '<span style="color:var(--muted)">No lifts entered.</span><span></span><span></span>'}</div>
-        ${c.RATIOS.length ? `<div class="eyebrow" style="margin-top:4px">Reference ratios</div><div class="ratio">${c.RATIOS.map(([n, v, lo, hi]) => `<span>${n}</span><span>${fmt(v, 2)}</span><span class="tag ${v < lo ? "warn" : "ok"}">${v < lo ? "low · target " + lo + "–" + hi : "on target"}</span>`).join("")}</div>` : ""}
-        <ul class="plain"><li>Ratios below target point to a weak link to prioritise (often upper back, overhead strength or quads) before chasing the bigger lifts.</li>${data.pullups ? `<li>Strict pull-ups: ${esc(data.pullups)}.</li>` : ""}</ul>
+        <ul class="plain"><li>Client-reported, last 3 months. The structural balance test below replaces these with tested numbers.</li>${data.pullups ? `<li>Strict pull-ups: ${esc(data.pullups)}.</li>` : ""}</ul>
       </div>
 
       <div class="card"><h3><span class="dot" style="background:var(--p-white)"></span>First habits</h3>
@@ -855,12 +897,45 @@ function renderReport() {
       </div>
     </div>
 
+    ${sbSectionHTML()}
+
     <div class="card"><h3>All answers</h3><div class="answers">${answersHTML()}</div></div>
     <p class="note">Estimates use standard formulas (Mifflin-St Jeor, Epley 1RM) and general coaching guidelines. They're a starting point to adjust from real progress, not medical or dietetic advice.</p>
   </div>`;
+  updateSB();
   $("#copyRep").onclick = () => copyText(reportText(), "Report copied");
   $("#dlRep").onclick = () => downloadText(reportText(), `${(data.name || "client").replace(/\W+/g, "-").toLowerCase()}-assessment.txt`);
   if (canPrint()) { $("#printRep").hidden = false; $("#printRep").onclick = () => window.print(); }
+}
+
+function sbSectionHTML() {
+  const u = wu(data);
+  const rows = STRUCTURAL_BALANCE.map(t => `${t.base ? `<tr class="sb-group"><th colspan="6">${t.group} · base: ${t.name}</th></tr>` : ""}
+    <tr><td><b>${t.name}</b><div class="help" style="margin:0">${t.test}${t.base ? "" : ` · target ${t.pct}%`}</div></td>
+      <td><input type="number" inputmode="decimal" step="any" data-f="sb_${t.k}_w" id="f-sb_${t.k}_w" value="${esc(data["sb_" + t.k + "_w"])}" aria-label="${t.name} weight${t.bw ? " added" : ""}" placeholder="${t.bw ? "added" : u}"></td>
+      <td>${t.mode === "rm" ? `<span class="e1rm">${t.test.split(" · ")[0]}</span>` : `<input type="number" inputmode="numeric" step="1" min="1" max="10" data-f="sb_${t.k}_r" id="f-sb_${t.k}_r" value="${esc(data["sb_" + t.k + "_r"])}" aria-label="${t.name} reps" placeholder="reps">`}</td>
+      <td class="e1rm" data-sbv="${t.k}"></td><td class="e1rm" data-sbt="${t.k}"></td><td data-sbs="${t.k}" style="min-width:150px"></td></tr>`).join("");
+  return `<div class="card" id="sbCard"><h3><span class="dot" style="background:var(--p-green)"></span>Structural balance test</h3>
+    <p style="margin:0;color:var(--muted);font-size:14px;max-width:70ch">Test at the first session. Enter a heavy set of 1–10 reps (converted to an estimated 1RM) or the stated rep max. Chin-ups and dips take the added weight; body weight is included. Blank rows fall back to the client's reported lifts.</p>
+    <div class="tbl-wrap"><table class="lifts sb"><thead><tr><th>Lift</th><th>Weight (${u})</th><th>Reps</th><th>Result</th><th>Target</th><th>vs target</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div id="sbSummary"></div></div>`;
+}
+function updateSB() {
+  if (!$("#sbCard")) return;
+  const c = calc(data), u = wu(data);
+  Object.values(c.sb.rows).forEach(r => {
+    const v = document.querySelector(`[data-sbv="${r.k}"]`), t = document.querySelector(`[data-sbt="${r.k}"]`), st = document.querySelector(`[data-sbs="${r.k}"]`);
+    const dp = x => x < 50 ? 1 : 0;
+    v.innerHTML = r.val != null ? `${fmt(r.val, dp(r.val))} ${u}${r.src !== "tested" ? `<div style="font-size:11px">${esc(r.src)}</div>` : ""}` : "–";
+    t.textContent = r.base ? "base" : r.target ? `${fmt(r.target, dp(r.target))} ${u}` : "–";
+    if (r.base || r.ratio == null) { st.innerHTML = r.base ? '<span class="tag muted">100%</span>' : ""; return; }
+    const w = Math.min(100, r.ratio * 100), col = { ok: "var(--ok)", warn: "var(--warn)", crit: "var(--crit)" }[r.status];
+    st.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><div class="meter" style="flex:1;min-width:60px"><i style="width:${w}%;background:${col}"></i></div><span class="mono" style="font-size:12px">${Math.round(r.ratio * 100)}%</span></div>`;
+  });
+  const weak = c.sb.weak;
+  $("#sbSummary").innerHTML = weak.length
+    ? `<div class="flags">${weak.map(r => `<div class="flag ${r.status}"><span class="pill">${r.status === "crit" ? "Weak link" : "Low"}</span><span><b>${esc(r.name)}</b> at ${Math.round(r.ratio * 100)}% of target. Bring up ${esc(r.fix)}.</span></div>`).join("")}</div>`
+    : Object.values(c.sb.rows).some(r => r.ratio != null) ? '<div class="flag ok"><span class="pill">Balanced</span><span>Every tested lift is within 5% of its target.</span></div>' : '<p class="note" style="margin:0">Enter the base lift and at least one other lift to see ratios.</p>';
 }
 
 function answerRows() {
@@ -905,7 +980,12 @@ function reportText() {
     `- Rate: ${c.rateKg ? fmt(c.fromKg(c.rateKg), 2) + " " + u + "/week" : "maintain"}`,
     `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
   L.push("", `RECOVERY: ${c.recovery ?? "–"}/100`);
-  if (c.RATIOS.length) { L.push("", "STRENGTH RATIOS"); c.RATIOS.forEach(([n, v, lo, hi]) => L.push(`- ${n}: ${v.toFixed(2)} (target ${lo}–${hi})`)); }
+  const sbRows = Object.values(c.sb.rows).filter(r => r.val != null);
+  if (sbRows.length) {
+    L.push("", "STRUCTURAL BALANCE");
+    sbRows.forEach(r => L.push(`- ${r.name}: ${fmt(r.val)} ${u}${r.mode === "rm" ? " (" + r.test.split(" · ")[0] + ")" : " est. 1RM"}${r.base ? " [base]" : r.target ? ` · target ${fmt(r.target, r.target < 50 ? 1 : 0)} (${r.pct}%) · ${Math.round(r.ratio * 100)}% of target` : ""} · ${r.src}`));
+    if (c.sb.weak.length) L.push("Weak links: " + c.sb.weak.map(r => r.name).join(", "));
+  }
   if (c.habits.length) { L.push("", "FIRST HABITS"); c.habits.forEach(h => L.push("- " + h)); }
   L.push("", "=".repeat(40), "ALL ANSWERS");
   answerRows().forEach(([t, rows]) => { L.push("", t.toUpperCase()); rows.forEach(([k, v]) => L.push(`${k}: ${v}`)); });
@@ -980,6 +1060,7 @@ const EXAMPLE = {
   habits_now: ["Training 3+ times a week", "Vegetables daily"], habits_past: "Meal prepping Sundays worked when I had a set lunch time.", habits_lost: "Meal prep, tracking, morning walks.",
   barriers: ["Time", "Family commitments", "Night eating"], streak: "1+ year", support: "Very supportive", checkin: "Weekly check-in", coach_style: "Explain the why",
   will_track: ["Daily morning weight", "Food (calories / macros)", "Training log", "Progress photos"],
+  sb_cgb_w: "175", sb_cgb_r: "3", sb_incline_w: "155", sb_incline_r: "3", sb_dip_w: "45", sb_dip_r: "5", sb_chin_w: "25", sb_chin_r: "3", sb_dbpress_w: "50", sb_triext_w: "75", sb_triext_r: "6", sb_er_w: "12", sb_bsq_w: "255", sb_bsq_r: "3", sb_fsq_w: "185", sb_fsq_r: "3", sb_dl_w: "315", sb_dl_r: "3",
   consent: ["My answers are accurate, and I'll tell my coach about any change in my health. I understand this isn't medical advice."]
 };
 

@@ -169,6 +169,24 @@ ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column;
 .ratio span:nth-child(3n+2) { font-family: var(--f-mono); }
 .tag { font: 500 11px var(--f-mono); padding: 3px 7px; border-radius: 3px; white-space: nowrap; }
 .tag.ok { background: var(--ok-bg); color: var(--ok); } .tag.warn { background: var(--warn-bg); color: var(--warn); } .tag.muted { background: var(--sunk); color: var(--muted); }
+.proto { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 12px 18px; margin: 0; font-size: 14px; }
+.proto dt { font: 500 11px/1.6 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 2px; }
+.proto dd { margin: 0; }
+.proto dd b { display: block; font-weight: 600; }
+.proto dd span { color: var(--muted); }
+@media (max-width: 560px) { .proto { grid-template-columns: minmax(0, 1fr); gap: 2px; } .proto dd { margin-bottom: 10px; } }
+table.road { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+table.road th { text-align: left; font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+table.road td { padding: 10px 10px 10px 0; border-bottom: 1px dashed var(--line); vertical-align: top; }
+table.road tr.deload td { background: var(--sunk); }
+table.road tr.deload td:first-child { padding-left: 8px; }
+table.road td:first-child { font-weight: 600; white-space: nowrap; }
+.wk { font: 500 12px var(--f-mono); color: var(--muted); display: block; font-weight: 500; }
+.map-row { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 10px 18px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.map-row:last-child { border-bottom: 0; }
+.map-row .chips .chip { font-size: 13px; }
+.map-row input[type=text] { max-width: 100%; font-size: 13px; padding: 6px 9px; }
+@media (max-width: 640px) { .map-row { grid-template-columns: minmax(0, 1fr); } }
 .answers { display: flex; flex-direction: column; gap: 18px; }
 .answers h3 { font-size: 17px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .answers dl { display: grid; grid-template-columns: minmax(140px, 38%) minmax(0, 1fr); gap: 6px 18px; margin: 10px 0 0; font-size: 14px; }
@@ -226,6 +244,27 @@ ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column;
 <script>
 /* ---------- Coach settings: fill these in before sending the page to clients ---------- */
 const COACH = { name: "", email: "" };
+
+/* Program length: two 12-week blocks with a deload week between, reassessed every 4 weeks. */
+const PROGRAM_PLAN = { blockWeeks: 12, deloadWeeks: 1, blocks: 2, reassessEvery: 4 };
+
+/* MAP (movement analysis & progressions) tests, scored at the assessment session.
+   Each test picks the progression the client starts on (level 1 = most regressed).
+   Edit names and progressions to match your KILO MAP course material. */
+const MAP_TESTS = [
+  { k: "trunk", name: "Trunk stability", region: "Trunk", levels: ["Dead bug", "Front plank", "Long-lever plank", "Ab wheel rollout"] },
+  { k: "squat", name: "Squat", region: "Lower body", levels: ["Box squat", "Goblet squat", "Heel-elevated front squat", "Back squat"] },
+  { k: "deadlift", name: "Deadlift", region: "Lower body", levels: ["Kettlebell deadlift from blocks", "Trap-bar deadlift", "Romanian deadlift", "Conventional deadlift"] },
+  { k: "split", name: "Split squat", region: "Lower body", sided: true, levels: ["Supported split squat", "Split squat", "Rear-foot-elevated split squat", "Front-foot-elevated split squat"] },
+  { k: "sgm", name: "Seated good morning", region: "Lower body", levels: ["Dowel hip-hinge drill", "Seated good morning", "Romanian deadlift", "Standing good morning"] },
+  { k: "stepup", name: "Step-up", region: "Lower body", sided: true, levels: ["Low box step-up", "Knee-height step-up", "Peterson step-up", "Loaded high step-up"] },
+  { k: "ankle", name: "Ankle dorsiflexion (knee to wall)", region: "Lower body", measure: "cm", min: 10 },
+  { k: "dip", name: "Dip", region: "Upper body", levels: ["Bench dip", "Assisted dip", "Bodyweight dip", "Weighted dip"] },
+  { k: "chin", name: "Chin-up", region: "Upper body", levels: ["Eccentric-only chin-up", "Band-assisted chin-up", "Bodyweight chin-up", "Weighted chin-up"] },
+  { k: "ohp", name: "Overhead press", region: "Upper body", sided: true, levels: ["Landmine press", "Half-kneeling 1-arm DB press", "Seated DB press", "Standing barbell press"] },
+  { k: "pushup", name: "Push-up", region: "Upper body", levels: ["Incline push-up", "Push-up", "Feet-elevated push-up", "Weighted push-up"] },
+  { k: "row", name: "Row", region: "Upper body", levels: ["High-incline inverted row", "Inverted row", "Chest-supported DB row", "Barbell row"] }
+];
 
 /* Structural balance targets (Poliquin-style). Each lift is a % of its base lift's 1RM:
    upper body against the close-grip bench press, lower body against the back squat.
@@ -371,8 +410,24 @@ const SECTIONS = [
       { id: "track_conf", label: "How accurate is that tracking?", type: "chips", options: ["I weigh nearly everything", "Mostly estimates", "Rough guess"], show: d => d.tracks_food === "Track daily in an app" },
       { id: "wt_trend", label: "Over the last 4 weeks your weight has…", type: "chips", options: ["Gone down", "Stayed about the same", "Gone up", "Not sure"] },
       { id: "wt_change", label: "By about how much?", type: "number", unit: wu, show: d => d.wt_trend === "Gone down" || d.wt_trend === "Gone up" },
+      { id: "nut_pref", label: "How would you like to manage your food?", type: "chips", options: ["Track calories & macros", "Hit a protein target only", "Hand portions, no tracking", "Follow a meal plan", "Not sure"] },
       { id: "typical_day", label: "Walk through a typical day of eating", help: "Times, meals, snacks, drinks. Weekends too if they're different.", type: "textarea" },
       { id: "meals", label: "Meals per day", type: "chips", options: ["1–2", "3", "4", "5+"] },
+      { group: [
+        { id: "first_meal", label: "First meal of the day", type: "chips", options: ["Before 8 am", "8–10 am", "10 am–noon", "After noon"] },
+        { id: "last_meal", label: "Last food of the day", type: "chips", options: ["Before 7 pm", "7–9 pm", "9–11 pm", "After 11 pm"] } ] },
+      { id: "hunger", label: "Hunger on a normal day", type: "scale", min: 1, max: 10, lo: "Rarely hungry", hi: "Always hungry" },
+      { id: "eat_speed", label: "How long does a meal take you?", type: "chips", options: ["Under 10 min", "10–20 min", "20+ min"] },
+      { id: "protein_src", label: "Protein foods you eat regularly", type: "multi", options: ["Meat", "Poultry", "Fish / seafood", "Eggs", "Greek yogurt / dairy", "Protein powder", "Tofu / tempeh", "Beans / lentils"] },
+      { group: [
+        { id: "veg", label: "Vegetable servings per day", type: "chips", options: ["0–1", "2–3", "4–5", "6+"] },
+        { id: "fruit", label: "Fruit servings per day", type: "chips", options: ["0", "1–2", "3+"] } ] },
+      { id: "fish", label: "Fatty fish (salmon, sardines, trout) per week", type: "chips", options: ["None", "Once", "2+ times"] },
+      { group: [
+        { id: "train_time", label: "When will you usually train?", type: "chips", options: ["Before 8 am", "8 am–noon", "Noon–4 pm", "4–7 pm", "After 7 pm"] },
+        { id: "pre_wo", label: "Before training you usually…", type: "chips", options: ["Train fasted", "Have a small snack", "Eat a meal 1–3 h before"] } ] },
+      { id: "trigger_foods", label: "Foods that bloat you or upset your stomach", type: "multi", options: ["Dairy", "Wheat / gluten", "Beans / lentils", "Onion / garlic", "Sweeteners", "Fried / greasy food", "None noticed"] },
+      { id: "weekend", label: "Weekend eating compared with weekdays", type: "chips", options: ["Pretty similar", "A bit looser", "Very different"] },
       { id: "pattern", label: "Which of these fit you?", type: "multi", options: ["Skip breakfast", "Snack often", "Eat late at night", "Eat out 3+ times a week", "Intermittent fasting", "Overeat on weekends", "Cook most meals"] },
       { id: "diet_style", label: "Eating style", type: "chips", options: ["No particular diet", "Vegetarian", "Vegan", "Pescatarian", "Low carb / keto", "Halal / kosher", "Other"] },
       { group: [
@@ -399,9 +454,20 @@ const SECTIONS = [
       { id: "sleep_hrs", label: "Sleep per night", type: "chips", options: ["Under 5 h", "5–6 h", "6–7 h", "7–8 h", "8+ h"] },
       { id: "sleep_q", label: "Sleep quality", type: "scale", min: 1, max: 10, lo: "Poor", hi: "Excellent" },
       { group: [
-        { id: "bed_wake", label: "Usual bed and wake times", type: "text" },
+        { id: "wake_time", label: "Usual wake time on work days", type: "chips", options: ["Before 5 am", "5–6 am", "6–7 am", "7–8 am", "After 8 am"] },
+        { id: "bed_wake", label: "Usual bedtime (and weekend times if different)", type: "text" } ] },
+      { group: [
+        { id: "sleep_latency", label: "Time to fall asleep", type: "chips", options: ["Under 15 min", "15–30 min", "30–60 min", "Over an hour"] },
         { id: "wake_night", label: "Wake during the night?", type: "chips", options: ["Rarely", "Once", "2+ times", "Same time most nights"] } ] },
-      { id: "screens", label: "Screens in the hour before bed?", type: "chips", options: YN },
+      { id: "rested", label: "Do you wake up feeling rested?", type: "chips", options: ["Most days", "Some days", "Rarely"] },
+      { id: "snore", label: "Do you snore, or has anyone noticed you stop breathing or gasp at night?", type: "chips", options: ["No", "I snore", "Snoring with gasping or pauses", "Don't know"] },
+      { group: [
+        { id: "screens", label: "Screens in the hour before bed?", type: "chips", options: YN },
+        { id: "caff_cut", label: "Last caffeine of the day", type: "chips", options: ["No caffeine", "Before noon", "Noon–2 pm", "2–5 pm", "After 5 pm"] } ] },
+      { id: "room", label: "Your bedroom is…", type: "multi", options: ["Dark", "Cool", "Quiet", "Phone out of reach"] },
+      { group: [
+        { id: "naps", label: "Naps", type: "chips", options: ["Never", "Sometimes", "Daily"] },
+        { id: "daylight", label: "Outdoor daylight in the morning", type: "chips", options: ["Most days", "Sometimes", "Rarely"] } ] },
       { id: "stress", label: "Overall stress", type: "scale", min: 1, max: 10, lo: "Calm", hi: "Overwhelmed" },
       { id: "stress_src", label: "Main sources of stress", type: "multi", options: ["Work", "Family", "Finances", "Health", "Relationships", "School", "None"] },
       { id: "energy", label: "Daily energy", type: "scale", min: 1, max: 10, lo: "Drained", hi: "Energetic" },
@@ -410,7 +476,13 @@ const SECTIONS = [
       { id: "digestion", label: "Digestion", type: "multi", options: ["Regular daily bowel movements", "Bloating", "Gas after meals", "Heartburn / reflux", "Constipation", "Loose stools", "No issues"] },
       { id: "cravings", label: "Regular cravings", type: "multi", options: ["Sugar", "Salt", "Bread / carbs", "Caffeine", "None"] },
       { id: "cold", label: "Often cold hands or feet?", type: "chips", options: YN },
-      { id: "schedule", label: "Work schedule", type: "chips", options: ["Regular days", "Shift work", "Night shifts", "Frequent travel"] }
+      { id: "schedule", label: "Work schedule", type: "chips", options: ["Regular days", "Shift work", "Night shifts", "Frequent travel"] },
+      { id: "sick", label: "Colds or flu per year", type: "chips", options: ["0–1", "2–3", "4+"] },
+      { id: "libido", label: "Sex drive lately (optional)", help: "A useful marker of recovery and hormonal health. Skip if you prefer.", type: "scale", min: 1, max: 10, lo: "Very low", hi: "Normal for me" },
+      { group: [
+        { id: "wearable", label: "Sleep or recovery tracker", type: "chips", options: ["Oura", "Whoop", "Apple Watch", "Garmin", "Other", "None"] },
+        { id: "rhr", label: "Resting heart rate, if known", type: "number", unit: "bpm" } ] },
+      { id: "recovery_tools", label: "Recovery habits you already use", type: "multi", options: ["Stretching / mobility", "Easy walks", "Massage", "Sauna", "Cold plunge", "Breathing / meditation", "None"] }
     ] },
 
   { id: "habits", title: "Habits & coaching", intro: "What you already do well, what got in the way before, and how you'd like to work together.",
@@ -573,7 +645,7 @@ document.addEventListener("click", e => {
     const id = chip.dataset.chip, v = chip.dataset.v;
     if (chip.dataset.multi === "1") {
       const arr = new Set(data[id] || []);
-      const exclusive = /^(None|None of these|None yet|No issues|No dips|None \/ not sure)$/;
+      const exclusive = /^(None|None of these|None yet|No issues|No dips|None \/ not sure|None noticed)$/;
       if (arr.has(v)) arr.delete(v); else {
         if (exclusive.test(v)) arr.clear(); else [...arr].forEach(a => exclusive.test(a) && arr.delete(a));
         arr.add(v);
@@ -596,11 +668,12 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const el = e.target.closest("[data-f]"); if (!el) return;
   data[el.dataset.f] = el.value; changed(true);
+  if (el.dataset.f === "start_date") { const y = window.scrollY; renderReport(); window.scrollTo(0, y); }
 });
 $("#panel").addEventListener("submit", e => e.preventDefault());
 function changed(fromTyping) {
   if (isExample) { isExample = false; }
-  save(); updateVisibility(); updateE1rm(); renderBar(); updateSB();
+  save(); updateVisibility(); updateE1rm(); renderBar(); updateSB(); updateMAP();
   if (!fromTyping) renderSteps(); else document.querySelectorAll("#steps .tick").forEach((t, i) => t.textContent = complete(i) ? "✓" : "");
 }
 let clearArmed = false;
@@ -648,6 +721,138 @@ function structuralBalance(d, lifts) {
   });
   const weak = Object.values(rows).filter(r => r.status && r.status !== "ok").sort((a, b) => a.ratio - b.ratio);
   return { rows, weak, tested: Object.values(rows).some(r => r.src === "tested") };
+}
+
+// MAP: starting progression per pattern, asymmetries and restrictions
+function mapResults(d) {
+  const rows = [], issues = [];
+  MAP_TESTS.forEach(t => {
+    if (t.measure) {
+      const L = num(d["map_" + t.k + "_l"]), R = num(d["map_" + t.k + "_r"]);
+      if (L == null && R == null) return;
+      rows.push({ ...t, L, R });
+      [["Left", L], ["Right", R]].forEach(([side, v]) => { if (v != null && v < t.min) issues.push(`${t.name}: ${side.toLowerCase()} ${v} ${t.measure} (under ${t.min}). Add ankle mobility before loaded squats.`); });
+      if (L != null && R != null && Math.abs(L - R) >= 2) issues.push(`${t.name}: ${Math.abs(L - R).toFixed(1)} ${t.measure} difference between sides.`);
+      return;
+    }
+    const lvl = d["map_" + t.k];
+    if (!lvl) return;
+    const i = t.levels.indexOf(lvl);
+    rows.push({ ...t, level: i + 1, start: lvl, side: d["map_" + t.k + "_side"], note: d["map_" + t.k + "_note"] });
+    if (d["map_" + t.k + "_side"] && d["map_" + t.k + "_side"] !== "Even") issues.push(`${t.name}: ${d["map_" + t.k + "_side"].toLowerCase()}. Start unilateral work on the weaker side and match reps.`);
+  });
+  const regressed = rows.filter(r => r.level && r.level <= 2);
+  return { rows, issues, regressed, scored: rows.length };
+}
+
+function nutritionProtocol(d, c) {
+  const out = [], kg = c.kg, mealsN = { "1–2": 2, "3": 3, "4": 4, "5+": 5 }[d.meals] || 4;
+  const fr = d.food_rel || [];
+  const noTrack = fr.includes("History of an eating disorder") || fr.includes("Feeling out of control around food");
+  let method = d.nut_pref && d.nut_pref !== "Not sure" ? d.nut_pref : (d.tracks_food === "Track daily in an app" ? "Track calories & macros" : "Hit a protein target only");
+  if (noTrack && method === "Track calories & macros") method = "Hand portions, no tracking";
+  const m = c.macros;
+  const methodTxt = {
+    "Track calories & macros": m ? `Track daily: ${fmt(r50(c.target))} kcal, ${m.p} g protein, ${m.f} g fat, ${m.c} g carbs. Weigh food for the first 2 weeks to calibrate.` : "Track daily against the targets once height, weight and age are in.",
+    "Hit a protein target only": m ? `Track protein only (${m.p} g/day) and weigh in daily. Calories are adjusted through portion changes if the weekly trend stalls.` : "Track protein only.",
+    "Hand portions, no tracking": `No tracking. Each meal: ${d.sex === "Female" ? "1 palm protein, 1 fist vegetables, 1 cupped hand carbs, 1 thumb fats" : "2 palms protein, 2 fists vegetables, 2 cupped hands carbs, 2 thumbs fats"}, ${mealsN} meals a day. Adjust by 1 portion of carbs or fats at the monthly check.`,
+    "Follow a meal plan": m ? `Coach-written meal plan at ${fmt(r50(c.target))} kcal, ${mealsN} meals, with 2–3 swap options per meal.` : "Coach-written meal plan."
+  }[method];
+  out.push(["Method", method + (noTrack ? " (tracking avoided because of food-relationship answers)" : ""), methodTxt]);
+
+  if (m) {
+    const days = c.days || 3, rest = 7 - days, delta = Math.round(m.c * 0.2 / 5) * 5;
+    const restC = rest > 0 ? Math.max(0, Math.round((m.c - delta * days / rest) / 5) * 5) : m.c;
+    out.push(["Carbs by day", `Training days ${m.c + delta} g · rest days ${restC} g`, "Same weekly total; more carbs around training, fewer on rest days. Protein stays the same every day."]);
+    const per = Math.round(m.p / mealsN / 5) * 5;
+    out.push(["Meal structure", `${mealsN} meals · about ${per} g protein each`, "Protein and a vegetable at every meal. Keep meals 3–5 hours apart." + (d.pattern || []).filter(x => x === "Eat late at night").map(() => " Close the kitchen 2–3 hours before bed.").join("")]);
+  }
+  const tt = d.train_time;
+  if (tt) {
+    const fasted = d.pre_wo === "Train fasted";
+    out.push(["Around training", tt === "Before 8 am" ? (fasted ? "Early, fasted: 20–30 g protein (shake) before, full meal after" : "Early: light protein + carb snack 30–60 min before, full meal after") : "Meal with protein and carbs 1–3 h before, protein + carb meal within 2 h after",
+      "Most of the day's carbs go in the meals before and after training."]);
+  }
+  const lowVeg = ["0–1", "2–3"].includes(d.veg), lowFruit = d.fruit === "0";
+  if (lowVeg || lowFruit) out.push(["Fibre", "Build to 4–6 vegetable servings and 1–3 fruit a day", "Add one serving a week. Aim for 25–35 g fibre."]);
+  const trig = (d.trigger_foods || []).filter(x => x !== "None noticed");
+  const dig = (d.digestion || []).filter(x => !["Regular daily bowel movements", "No issues"].includes(x));
+  if (trig.length || dig.length) out.push(["Digestion", trig.length ? `Remove ${trig.join(", ").toLowerCase()} for 3 weeks, then reintroduce one at a time` : "Slow down meals and note which foods cause symptoms",
+    `${d.eat_speed === "Under 10 min" ? "Meals take under 10 min: put the fork down between bites and aim for 15–20 min. " : ""}Log symptoms for 2 weeks. Persistent symptoms go to a doctor.`]);
+  if (kg) {
+    const L = (kg * 0.035 + 0.5 * ((c.days || 3) / 7)).toFixed(1);
+    out.push(["Water", `${L} L a day`, "About 35 ml per kg of body weight, plus 0.5–0.75 L per training hour."]);
+  }
+  if (["4–7", "8–14", "15+"].includes(d.alcohol)) out.push(["Alcohol", "Max 2 nights a week, never the night before training", "Count drinks in the calorie target if tracking."]);
+  if (num(d.hunger) >= 7) out.push(["Hunger", "High hunger: higher-volume, high-protein meals", "Lean protein, potatoes, fruit and vegetables first; keep a deficit small in month 1."]);
+  if (d.weekend === "Very different") out.push(["Weekends", "Plan weekend meals on Friday", "Keep protein and meal timing the same; one planned meal out."]);
+  const sup = ["Creatine monohydrate 3–5 g daily"];
+  if (m && num(d.protein_avg) != null && num(d.protein_avg) < m.p * 0.8 || !(d.protein_src || []).length) sup.push("Whey or plant protein to close the protein gap");
+  if (d.fish !== "2+ times") sup.push("Omega-3 (fish oil) if fatty fish is under twice a week");
+  if (d.daylight !== "Most days" || d.bloodwork !== "Within 12 months") sup.push("Vitamin D: test first, then supplement to the result");
+  if (num(d.sleep_q) != null && num(d.sleep_q) <= 5) sup.push("Magnesium glycinate in the evening (optional)");
+  out.push(["Supplements", sup.join(" · "), (d.meds || d.parq_meds === "Yes") ? "Client takes medication: check supplements with their doctor or pharmacist first." : "Keep it simple; food first."]);
+  return out;
+}
+
+function recoveryProtocol(d, c) {
+  const out = [];
+  const wakeH = { "Before 5 am": 4.5, "5–6 am": 5.5, "6–7 am": 6.5, "7–8 am": 7.5, "After 8 am": 8.5 }[d.wake_time];
+  const clock = h => { h = ((h % 24) + 24) % 24; const hh = Math.floor(h), mm = Math.round((h - hh) * 60 / 15) * 15; const H = (hh + (mm === 60 ? 1 : 0)) % 24, M = mm === 60 ? 0 : mm; return `${((H + 11) % 12) + 1}:${String(M).padStart(2, "0")} ${H < 12 ? "am" : "pm"}`; };
+  if (wakeH != null) {
+    const bed = wakeH - 8.25;
+    out.push(["Sleep window", `Lights out by ${clock(bed)} · up at ${clock(wakeH)}`, "8 hours in bed, same wake time 7 days a week (weekends within 1 hour)."]);
+    out.push(["Caffeine", `None after ${clock(bed - 9)}`, d.caff_cut === "2–5 pm" || d.caff_cut === "After 5 pm" ? `Currently drinking caffeine ${d.caff_cut.toLowerCase()}; move it earlier.` : "Keep caffeine 8–10 hours away from bedtime."]);
+  }
+  const wind = [];
+  if (d.screens === "Yes") wind.push("screens off 60 min before bed");
+  if (["30–60 min", "Over an hour"].includes(d.sleep_latency)) wind.push("30–60 min wind-down (dim lights, reading, warm shower)");
+  const room = d.room || [];
+  ["Dark", "Cool", "Quiet", "Phone out of reach"].filter(x => !room.includes(x)).forEach(x => wind.push({ Dark: "blackout the room or wear a mask", Cool: "cool room (about 18 °C / 65 °F)", Quiet: "earplugs or white noise", "Phone out of reach": "phone charging outside the bedroom" }[x]));
+  if (wind.length) out.push(["Sleep routine", wind[0][0].toUpperCase() + wind[0].slice(1) + (wind.length > 1 ? "; " + wind.slice(1).join("; ") : ""), "Add one change a week."]);
+  if (d.daylight !== "Most days" && d.daylight) out.push(["Morning light", "10 min outside within an hour of waking", "Helps set the sleep–wake rhythm."]);
+  if (d.naps === "Daily") out.push(["Naps", "Keep naps under 20 min and before 3 pm", ""]);
+  if (d.snore === "Snoring with gasping or pauses") out.push(["Sleep apnea", "Refer to a doctor for screening", "Treat before pushing fat loss or training volume."]);
+  const st = num(d.stress);
+  if (st != null && st >= 6) out.push(["Stress", "5–10 min breathing or a walk daily (e.g. after work)", st >= 8 ? "Sessions capped at 60 min; no extra conditioning in month 1." : "Keep one day a week fully off."]);
+  const stepsNext = { "Under 4,000": "5,000", "4,000–7,000": "8,000", "7,000–10,000": "10,000" }[d.steps];
+  if (stepsNext) out.push(["Steps", `Build to ${stepsNext} a day`, "Add about 1,000 a day each week. Walks after meals count."]);
+  out.push(["Daily check-in", "Rate sleep, stress, soreness and motivation 1–5 before training", "Two or more scores of 1–2: cut the day's sets by about a third and stop 2 reps short of failure."]);
+  if (d.wearable && d.wearable !== "None") out.push(["Tracker", `Use ${d.wearable} trends`, `Resting heart rate${d.rhr ? " (baseline " + d.rhr + " bpm)" : ""} 5+ bpm above baseline for 3 days, or HRV well below baseline: take an easier day.`]);
+  const tools = (d.recovery_tools || []).filter(x => x !== "None");
+  out.push(["Recovery work", "Easy walk or 10 min mobility on rest days" + (c.map && c.map.issues.length ? ", targeting the MAP restrictions" : ""), tools.length ? `Keep: ${tools.join(", ").toLowerCase()}.` : "Start with walks; add anything else later."]);
+  return out;
+}
+
+function roadmap(d, c) {
+  const P = PROGRAM_PLAN, tier = c.tier ?? 0;
+  const TR = [
+    ["Accumulation · 12–15 reps · 4-0-1-0 · technique and MAP progressions", "Accumulation · 10–12 reps · 3-1-1-0", "Intensification intro · 6–8 reps · 3-0-1-0", "Accumulation · 8–10 reps", "Intensification · 5–7 reps", "Accumulation 6–8 / intensification 4–6"],
+    ["Accumulation · 10–12 reps · 3-1-1-0", "Intensification · 6–8 reps · 3-0-1-0", "Accumulation · 8–10 reps", "Intensification · 5–7 reps", "Accumulation · 8–10 reps", "Intensification · 4–6 reps"],
+    ["Accumulation · 8–10 reps · 3-1-1-0", "Intensification · 4–6 reps · wave loading", "Accumulation · 6–8 reps", "Intensification · 3–5 reps", "Accumulation · 6–8 reps", "Intensification · 2–4 reps"],
+    ["2 wk accumulation 6–8 + 2 wk intensification 3–5", "2 wk accumulation 6–8 + 2 wk intensification 2–4 (clusters)", "Specialisation block for weak links", "2 wk accumulation + 2 wk intensification", "2 wk accumulation + 2 wk intensification (wave loading)", "Intensification · 1–3 reps"]
+  ][tier];
+  const g = d.goal_primary || "", fat = g === "Lose body fat", gain = g === "Build muscle";
+  const NU = c.phase === "Maintenance break first"
+    ? ["Maintenance: diet break and habits", "Fat loss starts", "Fat loss", "Fat loss", "Fat loss", "Back to maintenance"]
+    : fat ? ["Habits + small deficit", "Fat loss", "Fat loss", "Fat loss", "Fat loss", "Reverse to maintenance"]
+    : gain ? ["Maintenance + habits", "Lean gain", "Lean gain", "Lean gain", "Lean gain", "Lean gain or maintenance"]
+    : ["Maintenance + habits", "Maintenance", "Maintenance", "Maintenance", "Maintenance", "Maintenance"];
+  const start = d.start_date ? new Date(d.start_date + "T00:00:00") : null;
+  const dt = w => start && !isNaN(start) ? new Date(start.getTime() + (w - 1) * 7 * 864e5).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+  const rows = [];
+  let wk = 1, month = 0;
+  for (let b = 0; b < P.blocks; b++) {
+    for (let i = 0; i < P.blockWeeks / P.reassessEvery; i++) {
+      const w0 = wk, w1 = wk + P.reassessEvery - 1;
+      rows.push({ label: `Month ${month + 1}`, weeks: `Wk ${w0}–${w1}`, date: dt(w0), train: TR[month] || TR[TR.length - 1], nutr: NU[month] || NU[NU.length - 1],
+        test: w1 === P.blockWeeks * (b + 1) + P.deloadWeeks * b ? "Full reassessment: MAP, structural balance, body comp, photos" : "Monthly check: weight trend, measurements, photos, MAP retest of regressed patterns" });
+      wk = w1 + 1; month++;
+    }
+    if (b < P.blocks - 1) for (let i = 0; i < P.deloadWeeks; i++) { rows.push({ label: "Deload", weeks: `Wk ${wk}`, date: dt(wk), deload: true, train: "Volume down ~50%, same exercises, no sets to failure", nutr: fat ? "Maintenance calories (diet break)" : "Maintenance calories", test: "Block 1 review and block 2 plan" }); wk++; }
+  }
+  rows[rows.length - 1].test = "Final retest: MAP, structural balance, body comp. Renewal review.";
+  return { rows, totalWeeks: wk - 1 };
 }
 
 function calc(d) {
@@ -751,6 +956,7 @@ function calc(d) {
   }
 
   const sb = structuralBalance(d, lifts);
+  const map = mapResults(d);
 
   // Flags
   const flags = [];
@@ -767,6 +973,10 @@ function calc(d) {
   if (num(d.stress) >= 8) flags.push(["warn", `Stress ${d.stress}/10. Keep the first block simple and the deficit small.`]);
   if (["8–14", "15+"].includes(d.alcohol)) flags.push(["warn", `${d.alcohol} drinks a week. Affects sleep, recovery and intake.`]);
   if (d.joint_ache === "Often") flags.push(["warn", "Joints often ache as volume rises. Start low and add sets slowly."]);
+  if (d.snore === "Snoring with gasping or pauses") flags.push(["crit", "Snoring with gasping or pauses. Refer to a doctor for sleep apnea screening; it limits recovery and fat loss."]);
+  if (num(d.libido) != null && num(d.libido) <= 3) flags.push(["warn", `Low sex drive (${d.libido}/10). Watch recovery and energy intake; suggest blood work if it persists.`]);
+  if (d.sick === "4+") flags.push(["warn", "Sick 4+ times a year. Prioritise sleep and protein; suggest blood work (including vitamin D)."]);
+  map.issues.forEach(i => flags.push(["warn", "MAP: " + i]));
   if (d.wake_night === "Same time most nights") flags.push(["warn", "Wakes at the same time most nights. Look at evening food, alcohol, caffeine timing and stress."]);
   if (!flags.length && Object.keys(d).length > 6) flags.push(["ok", "No medical or injury flags reported. Clear to start."]);
 
@@ -783,8 +993,12 @@ function calc(d) {
   if ((d.will_track || []).includes("Daily morning weight")) habits.push("Weigh in every morning; judge progress on the weekly average trend, not single days.");
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
-  return { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
-    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, sb, flags, habits: habits.slice(0, 4), fromKg, imp };
+  const out = { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
+    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
+  out.nutrition = nutritionProtocol(d, out);
+  out.recoveryPlan = recoveryProtocol(d, out);
+  out.roadmap = roadmap(d, out);
+  return out;
 }
 
 /* ---------- Coach report ---------- */
@@ -843,6 +1057,7 @@ function renderReport() {
         </dl>` : ""}
         <ul class="plain">${c.program ? `<li>Methods: ${esc(c.program.methods)}.</li>` : ""}
           ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
+          ${c.map.regressed.length ? `<li><b>MAP regressions:</b> ${esc(c.map.regressed.map(r => r.name + " → " + r.start).join("; "))}.</li>` : ""}
           ${c.sb.weak.length ? `<li><b>Weak links from structural balance:</b> ${esc(c.sb.weak.slice(0, 3).map(r => r.fix.split(":")[0]).join("; "))}. Fix these in phase 1 before pushing the base lifts.</li>` : ""}
           ${(data.lagging || []).length ? `<li>Client wants to bring up: ${esc(data.lagging.join(", "))}.</li>` : ""}
           <li>Background: ${esc([(data.ta_type || []).join(", "), data.coached, data.layoff && "last consistent block: " + data.layoff.toLowerCase()].filter(Boolean).join(" · ") || "–")}.</li>
@@ -897,15 +1112,62 @@ function renderReport() {
       </div>
     </div>
 
+    <div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Nutrition protocol</h3><dl class="proto">${protoHTML(c.nutrition)}</dl></div>
+    <div class="card"><h3><span class="dot" style="background:var(--p-yellow)"></span>Recovery protocol</h3><dl class="proto">${protoHTML(c.recoveryPlan)}</dl></div>
+
+    <div class="card" id="roadCard">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-end">
+        <h3><span class="dot" style="background:var(--p-red)"></span>6-month roadmap · ${c.roadmap.totalWeeks} weeks</h3>
+        <label class="unit no-print">Start date <input type="date" data-f="start_date" id="f-start_date" value="${esc(data.start_date)}" style="max-width:170px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px"></label>
+      </div>
+      <div class="tbl-wrap"><table class="road"><thead><tr><th>Period</th><th>Training (${esc(c.tierName || "tier not set")})</th><th>Nutrition</th><th>Reassessment</th></tr></thead><tbody>
+        ${c.roadmap.rows.map(r => `<tr class="${r.deload ? "deload" : ""}"><td>${r.label}<span class="wk">${r.weeks}${r.date ? " · " + r.date : ""}</span></td><td>${esc(r.train)}</td><td>${esc(r.nutr)}</td><td>${esc(r.test)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <p style="margin:0;color:var(--muted);font-size:13px">Phase lengths match the monthly reassessments. Weak links from MAP and structural balance lead months 1–3; retest them before building block 2.</p>
+    </div>
+
+    ${mapSectionHTML()}
+
     ${sbSectionHTML()}
 
     <div class="card"><h3>All answers</h3><div class="answers">${answersHTML()}</div></div>
     <p class="note">Estimates use standard formulas (Mifflin-St Jeor, Epley 1RM) and general coaching guidelines. They're a starting point to adjust from real progress, not medical or dietetic advice.</p>
   </div>`;
-  updateSB();
+  updateSB(); updateMAP();
   $("#copyRep").onclick = () => copyText(reportText(), "Report copied");
   $("#dlRep").onclick = () => downloadText(reportText(), `${(data.name || "client").replace(/\W+/g, "-").toLowerCase()}-assessment.txt`);
   if (canPrint()) { $("#printRep").hidden = false; $("#printRep").onclick = () => window.print(); }
+}
+
+function protoHTML(rows) {
+  return rows.map(([k, main, sub]) => `<dt>${esc(k)}</dt><dd><b>${esc(main)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</dd>`).join("");
+}
+function mapSectionHTML() {
+  let region = "";
+  const rows = MAP_TESTS.map(t => {
+    const head = t.region !== region ? `<div class="eyebrow" style="padding-top:14px">${(region = t.region)}</div>` : "";
+    let body;
+    if (t.measure) {
+      body = `<div class="unit" style="flex-wrap:wrap">Left <input type="number" inputmode="decimal" step="0.5" data-f="map_${t.k}_l" id="f-map_${t.k}_l" value="${esc(data["map_" + t.k + "_l"])}" style="max-width:90px" aria-label="${t.name} left"> ${t.measure}
+        &nbsp; Right <input type="number" inputmode="decimal" step="0.5" data-f="map_${t.k}_r" id="f-map_${t.k}_r" value="${esc(data["map_" + t.k + "_r"])}" style="max-width:90px" aria-label="${t.name} right"> ${t.measure} · minimum ${t.min} ${t.measure}</div>`;
+    } else {
+      const lv = t.levels.map((o, i) => `<button type="button" class="chip" data-chip="map_${t.k}" data-multi="0" data-v="${esc(o)}" aria-pressed="${data["map_" + t.k] === o}">${i + 1} · ${esc(o)}</button>`).join("");
+      const side = t.sided ? `<div class="chips">${["Even", "Left weaker", "Right weaker"].map(o => `<button type="button" class="chip" data-chip="map_${t.k}_side" data-multi="0" data-v="${o}" aria-pressed="${data["map_" + t.k + "_side"] === o}">${o}</button>`).join("")}</div>` : "";
+      body = `<div class="chips">${lv}</div>${side}<input type="text" data-f="map_${t.k}_note" id="f-map_${t.k}_note" value="${esc(data["map_" + t.k + "_note"])}" placeholder="Compensations seen (e.g. knees cave, heels lift, lumbar flexion)" aria-label="${t.name} notes">`;
+    }
+    return `${head}<div class="map-row"><div><b>${t.name}</b></div><div style="display:flex;flex-direction:column;gap:8px;min-width:0">${body}</div></div>`;
+  }).join("");
+  return `<div class="card" id="mapCard"><h3><span class="dot" style="background:var(--p-green)"></span>MAP assessment</h3>
+    <p style="margin:0;color:var(--muted);font-size:14px;max-width:72ch">Score at the assessment session. Pick the progression the client can do with clean form; that's where they start. Retest regressed patterns at each monthly check.</p>
+    <div>${rows}</div><div id="mapSummary"></div></div>`;
+}
+function updateMAP() {
+  if (!$("#mapSummary")) return;
+  const m = calc(data).map;
+  if (!m.scored) { $("#mapSummary").innerHTML = '<p class="note" style="margin:0">No MAP results yet.</p>'; return; }
+  const starts = m.rows.filter(r => r.start).map(r => `<li><b>${esc(r.name)}:</b> start with ${esc(r.start)} (level ${r.level} of ${r.levels.length})${r.note ? " · " + esc(r.note) : ""}</li>`).join("");
+  $("#mapSummary").innerHTML = `<div class="eyebrow" style="margin:6px 0 8px">Starting exercises</div><ul class="plain">${starts}</ul>
+    ${m.issues.length ? `<div class="flags" style="margin-top:12px">${m.issues.map(i => `<div class="flag warn"><span class="pill">Watch</span><span>${esc(i)}</span></div>`).join("")}</div>` : ""}`;
 }
 
 function sbSectionHTML() {
@@ -979,7 +1241,10 @@ function reportText() {
     `- Expenditure: ${c.tdee ? fmt(r50(c.tdee)) + " kcal" : "–"} (${c.blend === 1 ? "from intake + weight trend" : c.blend ? "blend of intake + trend and equation" : "equation estimate"})`,
     `- Rate: ${c.rateKg ? fmt(c.fromKg(c.rateKg), 2) + " " + u + "/week" : "maintain"}`,
     `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
-  L.push("", `RECOVERY: ${c.recovery ?? "–"}/100`);
+  L.push("", "NUTRITION PROTOCOL"); c.nutrition.forEach(([k, a, b]) => L.push(`- ${k}: ${a}${b ? " (" + b + ")" : ""}`));
+  L.push("", `RECOVERY: ${c.recovery ?? "–"}/100`, "RECOVERY PROTOCOL"); c.recoveryPlan.forEach(([k, a, b]) => L.push(`- ${k}: ${a}${b ? " (" + b + ")" : ""}`));
+  L.push("", `6-MONTH ROADMAP (${c.roadmap.totalWeeks} weeks)`); c.roadmap.rows.forEach(r => L.push(`- ${r.label} (${r.weeks}${r.date ? ", " + r.date : ""}): ${r.train} | ${r.nutr} | ${r.test}`));
+  if (c.map.scored) { L.push("", "MAP ASSESSMENT"); c.map.rows.forEach(r => L.push(r.measure ? `- ${r.name}: L ${r.L ?? "–"} / R ${r.R ?? "–"} ${r.measure}` : `- ${r.name}: start ${r.start} (level ${r.level})${r.side ? " · " + r.side : ""}${r.note ? " · " + r.note : ""}`)); c.map.issues.forEach(i => L.push("  ! " + i)); }
   const sbRows = Object.values(c.sb.rows).filter(r => r.val != null);
   if (sbRows.length) {
     L.push("", "STRUCTURAL BALANCE");
@@ -1061,6 +1326,16 @@ const EXAMPLE = {
   barriers: ["Time", "Family commitments", "Night eating"], streak: "1+ year", support: "Very supportive", checkin: "Weekly check-in", coach_style: "Explain the why",
   will_track: ["Daily morning weight", "Food (calories / macros)", "Training log", "Progress photos"],
   sb_cgb_w: "175", sb_cgb_r: "3", sb_incline_w: "155", sb_incline_r: "3", sb_dip_w: "45", sb_dip_r: "5", sb_chin_w: "25", sb_chin_r: "3", sb_dbpress_w: "50", sb_triext_w: "75", sb_triext_r: "6", sb_er_w: "12", sb_bsq_w: "255", sb_bsq_r: "3", sb_fsq_w: "185", sb_fsq_r: "3", sb_dl_w: "315", sb_dl_r: "3",
+  nut_pref: "Track calories & macros", first_meal: "10 am–noon", last_meal: "9–11 pm", hunger: "6", eat_speed: "Under 10 min",
+  protein_src: ["Meat", "Poultry", "Eggs", "Protein powder"], veg: "2–3", fruit: "1–2", fish: "None", train_time: "4–7 pm", pre_wo: "Have a small snack",
+  trigger_foods: ["Dairy"], weekend: "Very different",
+  wake_time: "6–7 am", sleep_latency: "15–30 min", rested: "Some days", snore: "I snore", caff_cut: "2–5 pm", room: ["Dark", "Quiet"], naps: "Never", daylight: "Rarely",
+  sick: "2–3", libido: "6", wearable: "Apple Watch", rhr: "64", recovery_tools: ["Easy walks"],
+  map_trunk: "Front plank", map_squat: "Heel-elevated front squat", map_squat_note: "Heels lift and torso tips forward at depth",
+  map_deadlift: "Romanian deadlift", map_split: "Split squat", map_split_side: "Left weaker", map_sgm: "Seated good morning",
+  map_stepup: "Knee-height step-up", map_stepup_side: "Even", map_ankle_l: "8", map_ankle_r: "11",
+  map_dip: "Bodyweight dip", map_chin: "Bodyweight chin-up", map_ohp: "Half-kneeling 1-arm DB press", map_ohp_side: "Right weaker", map_ohp_note: "Ribs flare overhead",
+  map_pushup: "Push-up", map_row: "Chest-supported DB row",
   consent: ["My answers are accurate, and I'll tell my coach about any change in my health. I understand this isn't medical advice."]
 };
 

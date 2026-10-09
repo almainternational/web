@@ -263,15 +263,52 @@ const COACH_RULES = {
 /* Building-block exercises: one 4-week stage per phase of block 1, unilateral where possible.
    Block 2 keeps the stage 3 exercise and progresses load and tempo within the rep range. */
 const BUILDING_BLOCKS = [
-  { k: "knees", area: "Knees", inj: ["knee"], map: ["split", "stepup", "squat"], stages: ["Peterson step-up (VMO) + terminal knee extension", "Split squat, 3-s lowering", "Front-foot-elevated split squat"] },
-  { k: "elbows", area: "Elbows", inj: ["elbow", "wrist"], map: ["dip", "chin"], stages: ["1-arm DB hammer curl + 1-arm cable pushdown, slow lowering", "1-arm DB supinated curl + 1-arm overhead DB extension", "1-arm Zottman curl + 1-arm lying DB extension"] },
-  { k: "ankles", area: "Ankles", inj: ["ankle"], map: ["ankle"], stages: ["Seated 1-leg calf raise (bent knee) + tibialis raise", "Standing 1-leg calf raise, 2-s pause at the bottom", "1-leg calf raise off a step + 1-leg balance reach"] },
-  { k: "hams", area: "Hamstrings", inj: [], map: ["deadlift", "sgm"], stages: ["1-leg hip bridge + 1-leg lying leg curl", "1-leg supported DB Romanian deadlift", "1-leg 45° back extension (hamstring bias) + 1-leg seated leg curl"] },
-  { k: "posture", area: "Posture", inj: ["neck", "shoulder", "upback"], map: ["row", "ohp"], stages: ["1-arm chest-supported row + prone Y raise (trap 3)", "1-arm DB row + 1-arm DB external rotation, elbow on knee", "Half-kneeling 1-arm cable row + 1-arm face pull"] },
-  { k: "lowback", area: "Lower back", inj: ["lowback"], map: ["deadlift", "sgm"], stages: ["Bird dog + 45° back extension hold", "45° back extension, 3-s lowering", "1-leg 45° back extension"] },
-  { k: "trunk", area: "Trunk", inj: [], map: ["trunk"], stages: ["Dead bug + side plank from knees", "Half-kneeling Pallof press + side plank", "1-arm suitcase carry + half-kneeling cable chop"] },
-  { k: "flexion", area: "Hip & knee flexion", inj: ["hip"], map: ["stepup"], stages: ["Supine 1-leg banded hip flexion + 1-leg lying leg curl", "Standing 1-leg cable hip flexion + 1-leg seated leg curl", "Hanging knee raise + 1-leg leg curl, 4-s lowering"] }
+  { k: "knees", area: "Knees", inj: ["knee"], map: ["split", "stepup", "squat"], stages: ["Step-Up - Petersen + Step-Up - Heel Elevated", "Split Squat - DB (3-0-1-0)", "Split Squat - Front Foot Elevated - DB"] },
+  { k: "elbows", area: "Elbows", inj: ["elbow", "wrist"], map: ["dip", "chin"], stages: ["Curl - Seated - DB - Hammer (one arm) + Pressdown - Mid Pulley - One-Arm", "Curl - 45° Incline - DB (one arm) + French Press - Mid Pulley - Rope", "Curl - Seated - DB - Zottman + Triceps Extension - Flat - DB + Wrist Roller"] },
+  { k: "ankles", area: "Ankles", inj: ["ankle"], map: ["ankle"], stages: ["Anterior Tibialis Raise - Banded - Seated - Unilateral + Calf Raise - Seated - Unilateral", "Calf Raise - Standing - DB - Unilateral (2-s pause)", "Calf Raise - Standing - Duchaine - DB - Unilateral + Anterior Tibialis Raise - Standing"] },
+  { k: "hams", area: "Hamstrings", inj: [], map: ["deadlift", "sgm"], stages: ["Hip Extension - Supine - Unilateral", "Hip Extension - Supine - Swiss Ball - Unilateral + Deadlift - Romanian - DB", "Goodmorning - Seated - BB + Back Extension - Incline - DB"] },
+  { k: "posture", area: "Posture", inj: ["neck", "shoulder", "upback"], map: ["row", "ohp"], stages: ["External Rotation - Side Lying - DB - One-Arm + Scapula Retraction - Kneeling - Facing - Mid Pulley", "External Rotation - Elbow on Knee - DB - One-Arm + Row - Seated - Rope to Neck", "Trap 3 - Prone - 35° Incline - DB + External Rotation - Seated - Cuban Press - DB"] },
+  { k: "lowback", area: "Lower back", inj: ["lowback"], map: ["deadlift", "sgm"], stages: ["Back Extension - Horizontal (isometric holds) + Plank - Contralateral", "Back Extension - Incline - DB (3-0-1-0)", "Back Extension - Horizontal - DB + Reverse Hyper - Unilateral"] },
+  { k: "trunk", area: "Trunk", inj: [], map: ["trunk"], stages: ["Plank - Front + Plank - Side", "Pallof Press - Kneeling - Mid Pulley + Plank - One-Arm", "Wood Chop - Kneeling - High Pulley + Renegade Row - DB"] },
+  { k: "flexion", area: "Hip & knee flexion", inj: ["hip"], map: ["stepup"], stages: ["Knee Flexion - Swiss Ball - Unilateral + Low Ab Drill - Bent-Knee - Feet Down - Unilateral", "Leg Curl - Lying - Foot Neutral - Dorsiflexed - Unilateral + Low Ab Drill - Bent-Knee - Feet Up - Unilateral", "Leg Curl - Lying - (2-1) + Glute Ham Raise - Knee Flexion (assisted) + Hip Raise - Supine"] }
 ];
+
+/* KILO periodization.
+   Session: A = primary, B = assistance, C = remedial (building blocks).
+   Macrocycle: 12 weeks of mesocycles alternating accumulation (volume) and intensification (load),
+   deload, then a second 12-week macrocycle. Rep schemes are for the A series (% of 1RM). */
+const KILO = {
+  series: {
+    slow: [["A · primary", "4 sets · 6–12 reps · 4-0-X-0 · rest 90–120 s"], ["B · assistance", "3 sets · 8–12 reps · 3-0-1-0 · rest 60–90 s"], ["C · remedial", "2–3 sets · 10–15 reps · 3-0-1-0 · rest 30–60 s · building blocks"]],
+    advanced: [["A · primary", "4–6 sets · 1–12 reps · 4-0-X-0 · rest 90–240 s"], ["B · assistance", "3–4 sets · 6–12 reps · 3-0-1-0 · rest 60–90 s"], ["C · remedial", "2–3 sets · 10–15 reps · 3-0-1-0 · rest 30–60 s"]]
+  },
+  // Goal → [macrocycle 1 quality, macrocycle 2 quality] for Advanced clients
+  focus: {
+    "Lose body fat": ["Hypertrophy", "Absolute strength"], "Build muscle": ["Hypertrophy", "Absolute strength"], "Recomp (lose fat, build muscle)": ["Hypertrophy", "Absolute strength"],
+    "Get stronger": ["Hypertrophy", "Relative strength"], "Sport / performance": ["Absolute strength", "Power"], "Health & longevity": ["Hypertrophy", "Relative strength"], "Return from injury": ["Hypertrophy", "Hypertrophy"]
+  },
+  // Advanced (4+ years) mesocycles: [type, % 1RM, A-series scheme]
+  advanced: {
+    "Hypertrophy": [["Accumulation 1", 71, "15,12,10,10"], ["Intensification 1", 83, "5×6"], ["Accumulation 2", 75, "8,8,8,12,12"], ["Intensification 2", 88, "6×4"]],
+    "Absolute strength": [["Accumulation 1", 74, "4×10"], ["Intensification 1", 88, "5,5,5,3,3,3"], ["Accumulation 2", 80, "9,7,5,5,7,9"], ["Intensification 2", 94, "8×2"]],
+    "Relative strength": [["Accumulation 1", 85, "5×5"], ["Intensification 1", 90, "5,5,3,3,2,2"], ["Accumulation 2", 88, "7×4"], ["Intensification 2", 92, "3,3,3,2,2,2"]],
+    "Power": [["Accumulation 1", 83, "5×6"], ["Intensification 1", 92, "3,3,3,2,2,2"], ["Accumulation 2", 85, "6×5"], ["Intensification 2", 95, "3,2,1,3,2,1"]]
+  },
+  // Method timing per quality, one per mesocycle
+  methods: {
+    "Hypertrophy": ["Concentric · IMCA", "Eccentric · concentric-eccentric combo / eccentric only", "Concentric · IMCA", "Isometric · eccentric pauses"],
+    "Absolute strength": ["Concentric · IMCA", "Eccentric · extended eccentric / eccentric hook", "Isometric · concentric pauses", "Concentric · IMCA"],
+    "Relative strength": ["Concentric · IMCA", "Isometric · functional isometrics", "Concentric · IMCA", "Concentric · starting strength"],
+    "Power": ["Concentric · IMCA", "Speed-strength · explosive", "Concentric · IMCA", "Speed-strength · reactive"]
+  },
+  // Below Advanced: hypertrophy only, never under 6 reps, 4-week phases (beginner block-to-block jump of +2–4%)
+  slow: [
+    ["Accumulation", 70, "4×12", "Concentric · IMCA"], ["Intensification", 78, "5×8", "Eccentric · concentric-eccentric combo"], ["Accumulation", 72, "5×11", "Concentric · IMCA"],
+    ["Intensification", 80, "5×7", "Isometric · eccentric pauses"], ["Accumulation", 74, "4×10", "Concentric · IMCA"], ["Intensification", 81, "5×6", "Isometric · eccentric pauses"]
+  ],
+  loading: "Step loading: start about 10% under the target RM and build set to set to finish at it. All reps done: start 2–3% heavier next session. Missed reps: repeat the load."
+};
+
 
 /* MAP (movement analysis & progressions) tests, scored at the assessment session.
    Each test picks the progression the client starts on (level 1 = most regressed).
@@ -885,20 +922,9 @@ function recoveryProtocol(d, c) {
 }
 
 function roadmap(d, c) {
-  const P = PROGRAM_PLAN, R = COACH_RULES, tier = c.tier ?? 0;
+  const P = PROGRAM_PLAN, R = COACH_RULES, tier = c.tier ?? 0, adv = tier >= R.advancedTier;
   const F = R.firstMonthsDays, L = Math.max(F, c.laterDays || F);
   const uni = R.unilateralTiers.includes(tier), uni1 = R.unilateralBlock1Tiers.includes(tier);
-  const lim2 = uni ? "unilateral" : uni1 ? "unilateral + bilateral" : "";
-  const TR = tier >= R.advancedTier ? [
-    "2 wk accumulation 6–8 + 2 wk intensification 3–5", "2 wk accumulation 6–8 + 2 wk intensification 2–4 (clusters)", "Specialisation block for weak links", "2 wk accumulation + 2 wk intensification", "2 wk accumulation + 2 wk intensification (wave loading)", "Intensification · 1–3 reps"
-  ] : [
-    `${F}×/wk · unilateral · building blocks stage 1 · 12–15 reps · 4-0-1-0`,
-    `${F}×/wk · unilateral · building blocks stage 2 · 10–15 reps · 3-1-1-0`,
-    `${F}×/wk · unilateral · building blocks stage 3 · 10–12 reps`,
-    `${L}×/wk · ${lim2} · stage 3 progressed · 10–12 reps`,
-    `${L}×/wk · ${lim2} · 8–12 reps`,
-    `${L}×/wk · ${lim2} · 6–10 reps · retest`
-  ];
   const g = d.goal_primary || "", fat = g === "Lose body fat", gain = g === "Build muscle";
   const NU = c.lowEater
     ? ["Regular meals + protein ramp-up · no deficit", "Protein ramp-up · eat to maintenance", ...(fat ? ["Small deficit starts", "Fat loss", "Fat loss", "Reverse to maintenance"] : gain ? ["Lean gain", "Lean gain", "Lean gain", "Lean gain or maintenance"] : ["Maintenance", "Maintenance", "Maintenance", "Maintenance"])]
@@ -909,19 +935,39 @@ function roadmap(d, c) {
     : ["Maintenance + habits", "Maintenance", "Maintenance", "Maintenance", "Maintenance", "Maintenance"];
   const start = d.start_date ? new Date(d.start_date + "T00:00:00") : null;
   const dt = w => start && !isNaN(start) ? new Date(start.getTime() + (w - 1) * 7 * 864e5).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+  // monthly reassessment weeks: every 4 training weeks, skipping the deload
+  const blockLen = P.blockWeeks + P.deloadWeeks;
+  const checks = [];
+  for (let b = 0; b < P.blocks; b++) for (let w = P.reassessEvery; w <= P.blockWeeks; w += P.reassessEvery) checks.push(b * blockLen + w);
+  const finalWeek = P.blocks * P.blockWeeks + (P.blocks - 1) * P.deloadWeeks;
+  const monthOf = w => Math.min(NU.length - 1, Math.floor((w - 1 - (w > P.blockWeeks ? P.deloadWeeks : 0)) / P.reassessEvery));
+  const qualities = adv ? (KILO.focus[g] || ["Hypertrophy", "Relative strength"]) : ["Hypertrophy", "Hypertrophy (6+ reps)"];
+  const phaseWeeks = adv ? 3 : R.phaseWeeks;
+  const perBlock = Math.round(P.blockWeeks / phaseWeeks);
   const rows = [];
-  let wk = 1, month = 0;
+  let wk = 1, idx = 0;
   for (let b = 0; b < P.blocks; b++) {
-    for (let i = 0; i < P.blockWeeks / P.reassessEvery; i++) {
-      const w0 = wk, w1 = wk + P.reassessEvery - 1;
-      rows.push({ label: `Month ${month + 1}`, weeks: `Wk ${w0}–${w1}`, date: dt(w0), train: TR[month] || TR[TR.length - 1], nutr: NU[month] || NU[NU.length - 1],
-        test: w1 === P.blockWeeks * (b + 1) + P.deloadWeeks * b ? "Full reassessment: MAP, structural balance, body comp, photos" : "Monthly check: weight trend, measurements, photos, MAP retest of regressed patterns" });
-      wk = w1 + 1; month++;
+    for (let i = 0; i < perBlock; i++, idx++) {
+      const w0 = wk, w1 = wk + phaseWeeks - 1;
+      let name, train;
+      if (adv) {
+        const q = qualities[b] || qualities[0], m = KILO.advanced[q][i % 4], meth = KILO.methods[q][i % 4];
+        name = `${q} · ${m[0]}`; train = `A series ${m[2]} @ ~${m[1]}% · ${meth} · ${c.days || 4}×/wk`;
+      } else {
+        const m = KILO.slow[Math.min(idx, KILO.slow.length - 1)], days = b === 0 ? F : L;
+        const limbs = uni || (uni1 && b === 0) ? "one limb at a time" : uni1 ? "unilateral + some bilateral" : "";
+        name = `${m[0]} ${b * perBlock + i + 1}`;
+        train = `A series ${m[2]} @ ~${m[1]}% · ${m[3]} · ${days}×/wk · ${limbs} · building blocks stage ${b === 0 ? i + 1 : "3+"}`;
+      }
+      const inside = checks.filter(w => w >= w0 && w <= w1);
+      const test = inside.map(w => w === finalWeek ? `Wk ${w}: final retest (MAP, structural balance, body comp) · renewal review` : w % blockLen === P.blockWeeks ? `Wk ${w}: full reassessment (MAP, structural balance, body comp)` : `Wk ${w}: monthly check (weight trend, measurements, photos, MAP retest)`).join(" · ") || "Weekly check-ins";
+      const n0 = NU[monthOf(w0)], n1 = NU[monthOf(w1)];
+      rows.push({ label: name, weeks: `Wk ${w0}–${w1}`, date: dt(w0), train, nutr: n0 === n1 ? n0 : `${n0} → ${n1}`, test });
+      wk = w1 + 1;
     }
     if (b < P.blocks - 1) for (let i = 0; i < P.deloadWeeks; i++) { rows.push({ label: "Deload", weeks: `Wk ${wk}`, date: dt(wk), deload: true, train: "Volume down ~50%, same exercises, no sets to failure", nutr: fat ? "Maintenance calories (diet break)" : "Maintenance calories", test: "Block 1 review and block 2 plan" }); wk++; }
   }
-  rows[rows.length - 1].test = "Final retest: MAP, structural balance, body comp. Renewal review.";
-  return { rows, totalWeeks: wk - 1 };
+  return { rows, totalWeeks: wk - 1, qualities, phaseWeeks };
 }
 
 function calc(d) {
@@ -977,13 +1023,13 @@ function calc(d) {
   const R = COACH_RULES;
   const PROGRAM = [
     { phase: "Foundation: building blocks, one limb at a time", reps: R.repRange + " (start 12–15)", tempo: "4-0-1-0 / 3-1-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: `every ${R.phaseWeeks} weeks`,
-      structure: "Full body, unilateral building-block exercises", methods: "Stability and control first; add load only when every rep is clean. Nothing heavy in year one" },
+      structure: "One limb at a time for all 6 months", methods: "Stability and control first; load goes up only when every rep is clean. Nothing heavy in year one" },
     { phase: "Foundation: building blocks, one limb at a time", reps: R.repRange + " (start 12–15)", tempo: "3-1-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: `every ${R.phaseWeeks} weeks`,
-      structure: "Full body, unilateral building-block exercises", methods: "Slow progressions; add sets before load. Nothing heavy in year one" },
+      structure: "One limb at a time for all 6 months", methods: "Slow progressions; add sets before load. Nothing heavy in year one" },
     { phase: "Foundation (unilateral) in block 1, then hypertrophy with some bilateral lifts", reps: R.repRange + " (start 10–12)", tempo: "3-1-1-0 / 3-0-1-0", sets: "3 per exercise", rest: "75–90 s", change: `every ${R.phaseWeeks} weeks`,
-      structure: "Full body; unilateral first, A1/A2 antagonist pairs", methods: "Building blocks for joints and trunk every session; no sets under 6 reps" },
+      structure: "One limb at a time in block 1; some two-limb lifts in block 2", methods: "Building blocks for joints and trunk every session; no sets under 6 reps" },
     { phase: "Alternate accumulation and intensification", reps: "Intensification 1–5 · accumulation 6–8", tempo: "Controlled eccentric, explosive concentric on heavy work", sets: "5–8 per main lift", rest: "2–4 min on main lifts", change: "every 3–4 workouts",
-      structure: "Fewer exercises, more sets; specialisation for lagging areas", methods: "Wave loading, cluster sets, 1-6 contrast, specialisation" }
+      structure: "Bilateral primary lifts; unilateral assistance", methods: "Rep schemes from the goal's training quality (wave loading, stage and Paler systems, clusters)" }
   ];
   const program = tier == null ? null : PROGRAM[tier];
 
@@ -1124,16 +1170,13 @@ function renderReport() {
       <div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Training age & program type</h3>
         <div class="big">${lvlTxt}<small>${esc(data.train_age || "training age not given")}</small></div>
         ${c.program ? `<dl class="kv left">
-          <dt>Phase 1</dt><dd>${esc(c.program.phase)}</dd>
-          <dt>Reps</dt><dd>${esc(c.program.reps)}</dd>
-          <dt>Tempo</dt><dd>${esc(c.program.tempo)}</dd>
-          <dt>Sets</dt><dd>${esc(c.program.sets)}</dd>
-          <dt>Rest</dt><dd>${esc(c.program.rest)}</dd>
-          <dt>Change exercises</dt><dd>${esc(c.program.change)}</dd>
-          <dt>Structure</dt><dd>${esc(c.program.structure)}</dd>
+          <dt>Block 1 → 2</dt><dd>${esc(c.roadmap.qualities.join(" → "))}</dd>
+          <dt>Phases</dt><dd>${c.roadmap.phaseWeeks} weeks each, accumulation and intensification alternating</dd>
           <dt>Frequency</dt><dd>${esc(c.split || "–")}${data.session_len ? " · " + esc(data.session_len) : ""}</dd>
+          <dt>Limbs</dt><dd>${esc(c.program.structure)}</dd>
+          ${(c.slow ? KILO.series.slow : KILO.series.advanced).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}
         </dl>` : ""}
-        <ul class="plain">${c.program ? `<li>Methods: ${esc(c.program.methods)}.</li>` : ""}
+        <ul class="plain">${c.program ? `<li>${esc(c.program.methods)}.</li><li>${esc(KILO.loading)}</li>` : ""}
           ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
           ${c.map.regressed.length ? `<li><b>MAP regressions:</b> ${esc(c.map.regressed.map(r => r.name + " → " + r.start).join("; "))}.</li>` : ""}
           ${c.sb.weak.length ? `<li><b>Weak links from structural balance:</b> ${esc(c.sb.weak.slice(0, 3).map(r => r.fix.split(":")[0]).join("; "))}. Fix these in phase 1 before pushing the base lifts.</li>` : ""}
@@ -1198,10 +1241,10 @@ function renderReport() {
         <h3><span class="dot" style="background:var(--p-red)"></span>6-month roadmap · ${c.roadmap.totalWeeks} weeks</h3>
         <label class="unit no-print">Start date <input type="date" data-f="start_date" id="f-start_date" value="${esc(data.start_date)}" style="max-width:170px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px"></label>
       </div>
-      <div class="tbl-wrap"><table class="road"><thead><tr><th>Period</th><th>Training (${esc(c.tierName || "tier not set")})</th><th>Nutrition</th><th>Reassessment</th></tr></thead><tbody>
+      <div class="tbl-wrap"><table class="road"><thead><tr><th>Phase</th><th>Training (${esc(c.tierName || "tier not set")})</th><th>Nutrition</th><th>Reassessment</th></tr></thead><tbody>
         ${c.roadmap.rows.map(r => `<tr class="${r.deload ? "deload" : ""}"><td>${r.label}<span class="wk">${r.weeks}${r.date ? " · " + r.date : ""}</span></td><td>${esc(r.train)}</td><td>${esc(r.nutr)}</td><td>${esc(r.test)}</td></tr>`).join("")}
       </tbody></table></div>
-      <p style="margin:0;color:var(--muted);font-size:13px">Phase lengths match the monthly reassessments. Weak links from MAP and structural balance lead months 1–3; retest them before building block 2.</p>
+      <p style="margin:0;color:var(--muted);font-size:13px">${c.slow ? "Below Advanced: hypertrophy only, no sets under 6 reps, 4-week phases with intensity rising slowly block to block." : "Advanced: 3-week mesocycles alternating accumulation and intensification; block 2 changes the training quality."} Monthly reassessments sit inside the phases. Weak links from MAP and structural balance lead block 1.</p>
     </div>
 
     ${buildingBlocksHTML(c)}
@@ -1342,7 +1385,7 @@ function reportText() {
   L.push("FLAGS"); c.flags.forEach(([s, t]) => L.push(`- [${s === "crit" ? "ACT" : s === "warn" ? "WATCH" : "CLEAR"}] ${t}`));
   L.push("", "TRAINING AGE & PROGRAM TYPE",
     `- Training age: ${data.train_age || "–"} → ${c.tierName || "–"}`, `- Frequency: ${c.split || "–"}`,
-    ...(c.program ? [`- Phase 1: ${c.program.phase}`, `- Reps ${c.program.reps} · tempo ${c.program.tempo} · ${c.program.sets} · rest ${c.program.rest}`, `- Change exercises ${c.program.change}; ${c.program.structure}`, `- Methods: ${c.program.methods}`] : []),
+    ...(c.program ? [`- Block 1 → 2: ${c.roadmap.qualities.join(" → ")} · ${c.roadmap.phaseWeeks}-week phases`, `- Limbs: ${c.program.structure}`, ...(c.slow ? KILO.series.slow : KILO.series.advanced).map(([k, v]) => `- ${k}: ${v}`), `- ${c.program.methods}`, `- ${KILO.loading}`] : []),
     ...c.taNotes.map(n => "- " + n));
   L.push("", "ENERGY & MACROS",
     `- Target: ${c.target ? fmt(r50(c.target)) + " kcal/day" : "–"} (${c.phase})`,

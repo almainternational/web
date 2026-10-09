@@ -248,6 +248,31 @@ const COACH = { name: "", email: "" };
 /* Program length: two 12-week blocks with a deload week between, reassessed every 4 weeks. */
 const PROGRAM_PLAN = { blockWeeks: 12, deloadWeeks: 1, blocks: 2, reassessEvery: 4 };
 
+/* Coaching rules for everyone below Advanced (tiers 0–2: Novice, Developing, Intermediate). */
+const COACH_RULES = {
+  advancedTier: 3,            // tier at which the normal (heavier, more frequent) programming starts
+  repRange: "6–15",           // no heavy loading (under 6 reps) for at least the first year
+  firstMonthsDays: 2,         // sessions per week for the first 3 months
+  firstMonths: 3,
+  laterMaxDays: 3,            // cap after month 3 for non-advanced clients
+  phaseWeeks: 4,              // each phase / exercise selection runs 4 weeks
+  unilateralTiers: [0, 1],    // these tiers train one limb at a time for the whole 6 months
+  unilateralBlock1Tiers: [2]  // these tiers stay unilateral in block 1, then may add bilateral lifts (still 6–15 reps)
+};
+
+/* Building-block exercises: one 4-week stage per phase of block 1, unilateral where possible.
+   Block 2 keeps the stage 3 exercise and progresses load and tempo within the rep range. */
+const BUILDING_BLOCKS = [
+  { k: "knees", area: "Knees", inj: ["knee"], map: ["split", "stepup", "squat"], stages: ["Peterson step-up (VMO) + terminal knee extension", "Split squat, 3-s lowering", "Front-foot-elevated split squat"] },
+  { k: "elbows", area: "Elbows", inj: ["elbow", "wrist"], map: ["dip", "chin"], stages: ["1-arm DB hammer curl + 1-arm cable pushdown, slow lowering", "1-arm DB supinated curl + 1-arm overhead DB extension", "1-arm Zottman curl + 1-arm lying DB extension"] },
+  { k: "ankles", area: "Ankles", inj: ["ankle"], map: ["ankle"], stages: ["Seated 1-leg calf raise (bent knee) + tibialis raise", "Standing 1-leg calf raise, 2-s pause at the bottom", "1-leg calf raise off a step + 1-leg balance reach"] },
+  { k: "hams", area: "Hamstrings", inj: [], map: ["deadlift", "sgm"], stages: ["1-leg hip bridge + 1-leg lying leg curl", "1-leg supported DB Romanian deadlift", "1-leg 45° back extension (hamstring bias) + 1-leg seated leg curl"] },
+  { k: "posture", area: "Posture", inj: ["neck", "shoulder", "upback"], map: ["row", "ohp"], stages: ["1-arm chest-supported row + prone Y raise (trap 3)", "1-arm DB row + 1-arm DB external rotation, elbow on knee", "Half-kneeling 1-arm cable row + 1-arm face pull"] },
+  { k: "lowback", area: "Lower back", inj: ["lowback"], map: ["deadlift", "sgm"], stages: ["Bird dog + 45° back extension hold", "45° back extension, 3-s lowering", "1-leg 45° back extension"] },
+  { k: "trunk", area: "Trunk", inj: [], map: ["trunk"], stages: ["Dead bug + side plank from knees", "Half-kneeling Pallof press + side plank", "1-arm suitcase carry + half-kneeling cable chop"] },
+  { k: "flexion", area: "Hip & knee flexion", inj: ["hip"], map: ["stepup"], stages: ["Supine 1-leg banded hip flexion + 1-leg lying leg curl", "Standing 1-leg cable hip flexion + 1-leg seated leg curl", "Hanging knee raise + 1-leg leg curl, 4-s lowering"] }
+];
+
 /* MAP (movement analysis & progressions) tests, scored at the assessment session.
    Each test picks the progression the client starts on (level 1 = most regressed).
    Edit names and progressions to match your KILO MAP course material. */
@@ -416,6 +441,10 @@ const SECTIONS = [
       { group: [
         { id: "first_meal", label: "First meal of the day", type: "chips", options: ["Before 8 am", "8–10 am", "10 am–noon", "After noon"] },
         { id: "last_meal", label: "Last food of the day", type: "chips", options: ["Before 7 pm", "7–9 pm", "9–11 pm", "After 11 pm"] } ] },
+      { id: "protein_meals", label: "How many of your meals have a palm-sized (or bigger) serving of protein?", help: "Meat, fish, eggs, Greek yogurt, tofu, a protein shake…", type: "chips", options: ["0", "1", "2", "3+"] },
+      { group: [
+        { id: "am_appetite", label: "Appetite in the morning", type: "chips", options: ["Not hungry", "A little", "Hungry"] },
+        { id: "shakes", label: "Would you drink protein shakes?", type: "chips", options: ["Yes", "No", "Only dairy-free"] } ] },
       { id: "hunger", label: "Hunger on a normal day", type: "scale", min: 1, max: 10, lo: "Rarely hungry", hi: "Always hungry" },
       { id: "eat_speed", label: "How long does a meal take you?", type: "chips", options: ["Under 10 min", "10–20 min", "20+ min"] },
       { id: "protein_src", label: "Protein foods you eat regularly", type: "multi", options: ["Meat", "Poultry", "Fish / seafood", "Eggs", "Greek yogurt / dairy", "Protein powder", "Tofu / tempeh", "Beans / lentils"] },
@@ -745,6 +774,35 @@ function mapResults(d) {
   return { rows, issues, regressed, scored: rows.length };
 }
 
+// Protein ramp-up for clients who eat little: from today's intake to target in ~20 g steps every 2 weeks
+function proteinRamp(d, c) {
+  if (!c.macros) return null;
+  const target = c.macros.p;
+  const est = num(d.protein_avg) ?? ({ "0": 30, "1": 50, "2": 75, "3+": 100 }[d.protein_meals]);
+  if (est == null) return null;
+  const current = Math.round(est / 5) * 5;
+  if (current >= target * 0.9) return { current, target, steps: [], ok: true };
+  const steps = []; let g = current, w = 1;
+  while (g < target && steps.length < 8) { g = Math.min(target, g + 20); steps.push({ weeks: `Wk ${w}–${w + 1}`, g }); w += 2; }
+  const fr = d.food_rel || [], dairyBad = (d.trigger_foods || []).includes("Dairy"), veg = ["Vegetarian", "Vegan"].includes(d.diet_style);
+  const shakeOk = d.shakes !== "No";
+  const powder = dairyBad || d.diet_style === "Vegan" || d.shakes === "Only dairy-free" ? "whey isolate or a pea/soy protein" : "whey";
+  const foods = veg ? (d.diet_style === "Vegan" ? "tofu, tempeh, seitan, edamame, lentils, soy milk" : "eggs, Greek yogurt or skyr, cottage cheese, tofu, tempeh, lentils") : "eggs, Greek yogurt or skyr, cottage cheese, chicken, canned tuna or salmon, lean beef";
+  const noDairy = t => dairyBad ? t.split(", ").filter(x => !/yogurt|skyr|cottage|milk/i.test(x)).join(", ") : t;
+  const easy = d.cook === "Can't cook" || d.cook === "Basic" ? "rotisserie chicken, canned tuna, protein yogurt, deli turkey, cottage cheese, ready-to-drink shakes" : "batch-cook 2 proteins on Sunday and hard-boil a dozen eggs";
+  const lowAm = d.am_appetite === "Not hungry" || (d.pattern || []).includes("Skip breakfast");
+  const actions = [
+    [`Wk 1–2 · +20 g`, `Add one protein serving to the meal you already eat most reliably${lowAm && shakeOk ? `. Not hungry in the morning: drink it (a ${powder} shake${dairyBad ? "" : " or a protein milk/skyr drink"})` : ""}.`],
+    [`Wk 3–4`, `A palm of protein at every meal before anything else on the plate. Eat the protein first.`],
+    [`Wk 5–6`, `Add one protein snack a day: ${noDairy(veg ? "Greek yogurt, edamame, protein bar" : "Greek yogurt, jerky, cottage cheese, hard-boiled eggs, a shake")}.`],
+    [`Wk 7+`, `Grow portions by about 20 g a day every 2 weeks until ${target} g.`]
+  ];
+  const tips = [`Go-to foods: ${noDairy(foods)}.`, `Easy options: ${noDairy(easy)}.`];
+  if (num(d.hunger) != null && num(d.hunger) <= 4) tips.push("Low appetite: liquid protein and softer foods (yogurt, eggs, shakes, soups) are easier than big plates of meat.");
+  if (fr.some(x => x === "History of an eating disorder" || x === "Feeling out of control around food")) tips.push("Frame it as adding foods, never removing them; no tracking needed, count protein servings instead.");
+  return { current, target, steps, actions, tips, estimated: num(d.protein_avg) == null };
+}
+
 function nutritionProtocol(d, c) {
   const out = [], kg = c.kg, mealsN = { "1–2": 2, "3": 3, "4": 4, "5+": 5 }[d.meals] || 4;
   const fr = d.food_rel || [];
@@ -752,12 +810,14 @@ function nutritionProtocol(d, c) {
   let method = d.nut_pref && d.nut_pref !== "Not sure" ? d.nut_pref : (d.tracks_food === "Track daily in an app" ? "Track calories & macros" : "Hit a protein target only");
   if (noTrack && method === "Track calories & macros") method = "Hand portions, no tracking";
   const m = c.macros;
-  const methodTxt = {
+  let methodTxt = {
     "Track calories & macros": m ? `Track daily: ${fmt(r50(c.target))} kcal, ${m.p} g protein, ${m.f} g fat, ${m.c} g carbs. Weigh food for the first 2 weeks to calibrate.` : "Track daily against the targets once height, weight and age are in.",
     "Hit a protein target only": m ? `Track protein only (${m.p} g/day) and weigh in daily. Calories are adjusted through portion changes if the weekly trend stalls.` : "Track protein only.",
     "Hand portions, no tracking": `No tracking. Each meal: ${d.sex === "Female" ? "1 palm protein, 1 fist vegetables, 1 cupped hand carbs, 1 thumb fats" : "2 palms protein, 2 fists vegetables, 2 cupped hands carbs, 2 thumbs fats"}, ${mealsN} meals a day. Adjust by 1 portion of carbs or fats at the monthly check.`,
     "Follow a meal plan": m ? `Coach-written meal plan at ${fmt(r50(c.target))} kcal, ${mealsN} meals, with 2–3 swap options per meal.` : "Coach-written meal plan."
   }[method];
+  if (c.lowEater) out.push(["Eats too little", "Month 1: regular meals and the protein ramp-up, no calorie cut", "Low intake now. Cutting further would cost muscle and energy; build the eating habit first, then start any deficit in month 3."]);
+  if (c.lowEater && m && c.tdee && (method === "Track calories & macros" || method === "Follow a meal plan")) methodTxt = `Months 1–2: track protein only, following the ramp-up, and eat about ${fmt(r50(c.tdee))} kcal (maintenance). From month 3: ${method === "Follow a meal plan" ? "meal plan at" : "full tracking at"} ${fmt(r50(c.target))} kcal, ${m.p} g protein, ${m.f} g fat, ${m.c} g carbs.`;
   out.push(["Method", method + (noTrack ? " (tracking avoided because of food-relationship answers)" : ""), methodTxt]);
 
   if (m) {
@@ -787,7 +847,7 @@ function nutritionProtocol(d, c) {
   if (num(d.hunger) >= 7) out.push(["Hunger", "High hunger: higher-volume, high-protein meals", "Lean protein, potatoes, fruit and vegetables first; keep a deficit small in month 1."]);
   if (d.weekend === "Very different") out.push(["Weekends", "Plan weekend meals on Friday", "Keep protein and meal timing the same; one planned meal out."]);
   const sup = ["Creatine monohydrate 3–5 g daily"];
-  if (m && num(d.protein_avg) != null && num(d.protein_avg) < m.p * 0.8 || !(d.protein_src || []).length) sup.push("Whey or plant protein to close the protein gap");
+  if ((c.ramp && !c.ramp.ok && d.shakes !== "No") || !(d.protein_src || []).length) sup.push("Whey or plant protein to close the protein gap");
   if (d.fish !== "2+ times") sup.push("Omega-3 (fish oil) if fatty fish is under twice a week");
   if (d.daylight !== "Most days" || d.bloodwork !== "Within 12 months") sup.push("Vitamin D: test first, then supplement to the result");
   if (num(d.sleep_q) != null && num(d.sleep_q) <= 5) sup.push("Magnesium glycinate in the evening (optional)");
@@ -825,15 +885,24 @@ function recoveryProtocol(d, c) {
 }
 
 function roadmap(d, c) {
-  const P = PROGRAM_PLAN, tier = c.tier ?? 0;
-  const TR = [
-    ["Accumulation · 12–15 reps · 4-0-1-0 · technique and MAP progressions", "Accumulation · 10–12 reps · 3-1-1-0", "Intensification intro · 6–8 reps · 3-0-1-0", "Accumulation · 8–10 reps", "Intensification · 5–7 reps", "Accumulation 6–8 / intensification 4–6"],
-    ["Accumulation · 10–12 reps · 3-1-1-0", "Intensification · 6–8 reps · 3-0-1-0", "Accumulation · 8–10 reps", "Intensification · 5–7 reps", "Accumulation · 8–10 reps", "Intensification · 4–6 reps"],
-    ["Accumulation · 8–10 reps · 3-1-1-0", "Intensification · 4–6 reps · wave loading", "Accumulation · 6–8 reps", "Intensification · 3–5 reps", "Accumulation · 6–8 reps", "Intensification · 2–4 reps"],
-    ["2 wk accumulation 6–8 + 2 wk intensification 3–5", "2 wk accumulation 6–8 + 2 wk intensification 2–4 (clusters)", "Specialisation block for weak links", "2 wk accumulation + 2 wk intensification", "2 wk accumulation + 2 wk intensification (wave loading)", "Intensification · 1–3 reps"]
-  ][tier];
+  const P = PROGRAM_PLAN, R = COACH_RULES, tier = c.tier ?? 0;
+  const F = R.firstMonthsDays, L = Math.max(F, c.laterDays || F);
+  const uni = R.unilateralTiers.includes(tier), uni1 = R.unilateralBlock1Tiers.includes(tier);
+  const lim2 = uni ? "unilateral" : uni1 ? "unilateral + bilateral" : "";
+  const TR = tier >= R.advancedTier ? [
+    "2 wk accumulation 6–8 + 2 wk intensification 3–5", "2 wk accumulation 6–8 + 2 wk intensification 2–4 (clusters)", "Specialisation block for weak links", "2 wk accumulation + 2 wk intensification", "2 wk accumulation + 2 wk intensification (wave loading)", "Intensification · 1–3 reps"
+  ] : [
+    `${F}×/wk · unilateral · building blocks stage 1 · 12–15 reps · 4-0-1-0`,
+    `${F}×/wk · unilateral · building blocks stage 2 · 10–15 reps · 3-1-1-0`,
+    `${F}×/wk · unilateral · building blocks stage 3 · 10–12 reps`,
+    `${L}×/wk · ${lim2} · stage 3 progressed · 10–12 reps`,
+    `${L}×/wk · ${lim2} · 8–12 reps`,
+    `${L}×/wk · ${lim2} · 6–10 reps · retest`
+  ];
   const g = d.goal_primary || "", fat = g === "Lose body fat", gain = g === "Build muscle";
-  const NU = c.phase === "Maintenance break first"
+  const NU = c.lowEater
+    ? ["Regular meals + protein ramp-up · no deficit", "Protein ramp-up · eat to maintenance", ...(fat ? ["Small deficit starts", "Fat loss", "Fat loss", "Reverse to maintenance"] : gain ? ["Lean gain", "Lean gain", "Lean gain", "Lean gain or maintenance"] : ["Maintenance", "Maintenance", "Maintenance", "Maintenance"])]
+    : c.phase === "Maintenance break first"
     ? ["Maintenance: diet break and habits", "Fat loss starts", "Fat loss", "Fat loss", "Fat loss", "Back to maintenance"]
     : fat ? ["Habits + small deficit", "Fat loss", "Fat loss", "Fat loss", "Fat loss", "Reverse to maintenance"]
     : gain ? ["Maintenance + habits", "Lean gain", "Lean gain", "Lean gain", "Lean gain", "Lean gain or maintenance"]
@@ -905,15 +974,16 @@ function calc(d) {
   if (tier != null && tier >= 2 && tech.length < 3) taNotes.push("Few lifts done confidently: spend phase 1 on technique for the main patterns.");
   const level = tier == null ? null : [0, 1, 1, 2][tier];
   const LEVELS = ["Beginner", "Intermediate", "Advanced"];
+  const R = COACH_RULES;
   const PROGRAM = [
-    { phase: "General preparation (accumulation)", reps: "10–15", tempo: "3-1-1-0 or 4-0-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: "every 6–8 workouts",
-      structure: "Straight sets or simple A1/A2 antagonist pairs, 5–6 exercises", methods: "Dumbbells, cables and unilateral work; learn the main patterns; fix structural imbalances first" },
-    { phase: "Alternate accumulation and intensification every 2–3 weeks", reps: "Accumulation 8–12 · intensification 5–8", tempo: "3-1-1-0 / 3-0-1-0", sets: "3–4 per exercise", rest: "75–120 s", change: "every 6 workouts",
-      structure: "A1/A2 antagonist pairs, 4–6 exercises", methods: "Add barbell lifts as technique allows; tempo stays strict" },
-    { phase: "Alternate accumulation and intensification every 2–3 weeks", reps: "Accumulation 6–10 · intensification 3–6", tempo: "3-0-1-0 / 2-0-X-0 on heavy work", sets: "4–5 per exercise", rest: "90–180 s", change: "every 4–6 workouts",
-      structure: "A1/A2 pairs; heavy lift first, then assistance", methods: "Wave loading, post-fatigue supersets, mechanical drop sets" },
-    { phase: "Intensification-weighted blocks, short accumulation phases", reps: "Intensification 1–5 · accumulation 6–8", tempo: "Controlled eccentric, explosive concentric on heavy work", sets: "5–8 per main lift", rest: "2–4 min on main lifts", change: "every 3–4 workouts",
-      structure: "Fewer exercises, more sets; specialisation blocks for lagging areas", methods: "Wave loading, cluster sets, 1-6 contrast, specialisation" }
+    { phase: "Foundation: building blocks, one limb at a time", reps: R.repRange + " (start 12–15)", tempo: "4-0-1-0 / 3-1-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: `every ${R.phaseWeeks} weeks`,
+      structure: "Full body, unilateral building-block exercises", methods: "Stability and control first; add load only when every rep is clean. Nothing heavy in year one" },
+    { phase: "Foundation: building blocks, one limb at a time", reps: R.repRange + " (start 12–15)", tempo: "3-1-1-0", sets: "2–3 per exercise", rest: "60–90 s", change: `every ${R.phaseWeeks} weeks`,
+      structure: "Full body, unilateral building-block exercises", methods: "Slow progressions; add sets before load. Nothing heavy in year one" },
+    { phase: "Foundation (unilateral) in block 1, then hypertrophy with some bilateral lifts", reps: R.repRange + " (start 10–12)", tempo: "3-1-1-0 / 3-0-1-0", sets: "3 per exercise", rest: "75–90 s", change: `every ${R.phaseWeeks} weeks`,
+      structure: "Full body; unilateral first, A1/A2 antagonist pairs", methods: "Building blocks for joints and trunk every session; no sets under 6 reps" },
+    { phase: "Alternate accumulation and intensification", reps: "Intensification 1–5 · accumulation 6–8", tempo: "Controlled eccentric, explosive concentric on heavy work", sets: "5–8 per main lift", rest: "2–4 min on main lifts", change: "every 3–4 workouts",
+      structure: "Fewer exercises, more sets; specialisation for lagging areas", methods: "Wave loading, cluster sets, 1-6 contrast, specialisation" }
   ];
   const program = tier == null ? null : PROGRAM[tier];
 
@@ -930,7 +1000,12 @@ function calc(d) {
 
   const days = num(d.days);
   const SPLITS = { 2: "Full body × 2", 3: "Full body × 3", 4: "Upper / Lower × 2", 5: "Upper / Lower + Push / Pull / Legs", 6: "Push / Pull / Legs × 2" };
-  const split = days ? SPLITS[days] : null;
+  const slow = tier == null || tier < COACH_RULES.advancedTier;
+  const laterDays = days ? Math.min(days, COACH_RULES.laterMaxDays) : COACH_RULES.laterMaxDays;
+  const split = slow
+    ? `Full body × ${COACH_RULES.firstMonthsDays} for months 1–${COACH_RULES.firstMonths}, then full body × ${Math.max(COACH_RULES.firstMonthsDays, laterDays)}`
+    : days ? SPLITS[days] : null;
+  if (slow && days && days > COACH_RULES.firstMonthsDays) taNotes.push(`Client has ${days} days available; keep it to ${COACH_RULES.firstMonthsDays} sessions a week for the first ${COACH_RULES.firstMonths} months. Extra days can be walks or mobility.`);
 
   // Energy target by goal
   const g = d.goal_primary || "";
@@ -955,6 +1030,8 @@ function calc(d) {
     macros = { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2) };
   }
 
+  const calAvg = num(d.cal_avg);
+  const lowEater = !!((calAvg && bmr && calAvg < bmr * 1.3) || d.meals === "1–2" || ["0", "1"].includes(d.protein_meals) || ((d.pattern || []).includes("Skip breakfast") && d.am_appetite === "Not hungry"));
   const sb = structuralBalance(d, lifts);
   const map = mapResults(d);
 
@@ -994,7 +1071,8 @@ function calc(d) {
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
   const out = { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
-    lifts, recovery, split, days, phase, ratePct, rateKg, target, macros, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
+    lifts, recovery, split, slow, laterDays, days, phase, ratePct, rateKg, target, macros, lowEater, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
+  out.ramp = proteinRamp(d, out);
   out.nutrition = nutritionProtocol(d, out);
   out.recoveryPlan = recoveryProtocol(d, out);
   out.roadmap = roadmap(d, out);
@@ -1053,7 +1131,7 @@ function renderReport() {
           <dt>Rest</dt><dd>${esc(c.program.rest)}</dd>
           <dt>Change exercises</dt><dd>${esc(c.program.change)}</dd>
           <dt>Structure</dt><dd>${esc(c.program.structure)}</dd>
-          <dt>Split</dt><dd>${esc(c.split || "–")}${data.session_len ? " · " + esc(data.session_len) : ""}</dd>
+          <dt>Frequency</dt><dd>${esc(c.split || "–")}${data.session_len ? " · " + esc(data.session_len) : ""}</dd>
         </dl>` : ""}
         <ul class="plain">${c.program ? `<li>Methods: ${esc(c.program.methods)}.</li>` : ""}
           ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
@@ -1126,6 +1204,10 @@ function renderReport() {
       <p style="margin:0;color:var(--muted);font-size:13px">Phase lengths match the monthly reassessments. Weak links from MAP and structural balance lead months 1–3; retest them before building block 2.</p>
     </div>
 
+    ${buildingBlocksHTML(c)}
+
+    ${rampHTML(c)}
+
     ${mapSectionHTML()}
 
     ${sbSectionHTML()}
@@ -1137,6 +1219,32 @@ function renderReport() {
   $("#copyRep").onclick = () => copyText(reportText(), "Report copied");
   $("#dlRep").onclick = () => downloadText(reportText(), `${(data.name || "client").replace(/\W+/g, "-").toLowerCase()}-assessment.txt`);
   if (canPrint()) { $("#printRep").hidden = false; $("#printRep").onclick = () => window.print(); }
+}
+
+function blockPriority(b, c) {
+  const why = [];
+  b.inj.forEach(k => { const st = data["inj_" + k]; if (st && st !== "None") why.push(`${st.toLowerCase()} ${REGIONS.find(r => r[0] === k)[1].toLowerCase()} issue`); });
+  c.map.rows.forEach(r => { if (b.map.includes(r.k) && ((r.level && r.level <= 2) || (r.side && r.side !== "Even") || (r.measure && ((r.L != null && r.L < r.min) || (r.R != null && r.R < r.min))))) why.push("MAP " + r.name.toLowerCase()); });
+  return why;
+}
+function buildingBlocksHTML(c) {
+  const adv = c.tier != null && c.tier >= COACH_RULES.advancedTier;
+  const rows = BUILDING_BLOCKS.map(b => { const why = blockPriority(b, c); return `<tr><td><b>${b.area}</b>${why.length ? `<span class="tag warn" style="display:inline-block;margin-top:4px">priority · ${esc(why.join(", "))}</span>` : ""}</td>${b.stages.map(x => `<td>${esc(x)}</td>`).join("")}</tr>`; }).join("");
+  return `<div class="card" id="blocksCard"><h3><span class="dot" style="background:var(--p-yellow)"></span>Building blocks · block 1</h3>
+    <p style="margin:0;color:var(--muted);font-size:14px;max-width:76ch">${adv ? "Advanced client: use these as warm-ups and accessories for the priority areas." : `Every session in block 1. One limb at a time, ${COACH_RULES.repRange} reps, slow tempo; each stage runs ${COACH_RULES.phaseWeeks} weeks. Block 2 keeps stage 3 and adds load or a slower tempo.`} Priority areas get done first in the session and an extra set.</p>
+    <div class="tbl-wrap"><table class="road"><thead><tr><th>Area</th><th>Wk 1–4</th><th>Wk 5–8</th><th>Wk 9–12</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function rampHTML(c) {
+  const r = c.ramp;
+  if (!r) return "";
+  if (r.ok) return `<div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Protein ramp-up</h3><p style="margin:0">Already eating about ${r.current} g a day, close to the ${r.target} g target. Keep protein at every meal.</p></div>`;
+  const max = r.target;
+  const bars = [{ weeks: "Now", g: r.current }, ...r.steps].map(s => `<div style="display:grid;grid-template-columns:70px minmax(0,1fr) 56px;gap:10px;align-items:center;font-size:13px"><span class="mono" style="color:var(--muted)">${s.weeks}</span><div class="meter"><i style="width:${Math.round(s.g / max * 100)}%;background:${s.weeks === "Now" ? "var(--muted)" : "var(--accent)"}"></i></div><span class="mono">${s.g} g</span></div>`).join("");
+  return `<div class="card" id="rampCard"><h3><span class="dot" style="background:var(--p-blue)"></span>Protein ramp-up</h3>
+    <div class="big">${r.current} → ${r.target} g<small>per day · ${r.steps.length * 2} weeks${r.estimated ? " · current intake estimated from protein servings" : ""}</small></div>
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:560px">${bars}</div>
+    <dl class="proto">${r.actions.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <ul class="plain">${r.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>`;
 }
 
 function protoHTML(rows) {
@@ -1178,7 +1286,7 @@ function sbSectionHTML() {
       <td>${t.mode === "rm" ? `<span class="e1rm">${t.test.split(" · ")[0]}</span>` : `<input type="number" inputmode="numeric" step="1" min="1" max="10" data-f="sb_${t.k}_r" id="f-sb_${t.k}_r" value="${esc(data["sb_" + t.k + "_r"])}" aria-label="${t.name} reps" placeholder="reps">`}</td>
       <td class="e1rm" data-sbv="${t.k}"></td><td class="e1rm" data-sbt="${t.k}"></td><td data-sbs="${t.k}" style="min-width:150px"></td></tr>`).join("");
   return `<div class="card" id="sbCard"><h3><span class="dot" style="background:var(--p-green)"></span>Structural balance test</h3>
-    <p style="margin:0;color:var(--muted);font-size:14px;max-width:70ch">Test at the first session. Enter a heavy set of 1–10 reps (converted to an estimated 1RM) or the stated rep max. Chin-ups and dips take the added weight; body weight is included. Blank rows fall back to the client's reported lifts.</p>
+    <p style="margin:0;color:var(--muted);font-size:14px;max-width:70ch">Test at the first session. Enter a heavy set of 1–10 reps (converted to an estimated 1RM) or the stated rep max. Chin-ups and dips take the added weight; body weight is included. Blank rows fall back to the client's reported lifts.${calc(data).slow ? " <b>This client is below Advanced: don't test 1RMs. Use sets of 8–10 reps and let the page estimate.</b>" : ""}</p>
     <div class="tbl-wrap"><table class="lifts sb"><thead><tr><th>Lift</th><th>Weight (${u})</th><th>Reps</th><th>Result</th><th>Target</th><th>vs target</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div id="sbSummary"></div></div>`;
 }
@@ -1233,7 +1341,7 @@ function reportText() {
   if (isExample) L.push("(EXAMPLE CLIENT)", "");
   L.push("FLAGS"); c.flags.forEach(([s, t]) => L.push(`- [${s === "crit" ? "ACT" : s === "warn" ? "WATCH" : "CLEAR"}] ${t}`));
   L.push("", "TRAINING AGE & PROGRAM TYPE",
-    `- Training age: ${data.train_age || "–"} → ${c.tierName || "–"}`, `- Split: ${c.split || "–"}`,
+    `- Training age: ${data.train_age || "–"} → ${c.tierName || "–"}`, `- Frequency: ${c.split || "–"}`,
     ...(c.program ? [`- Phase 1: ${c.program.phase}`, `- Reps ${c.program.reps} · tempo ${c.program.tempo} · ${c.program.sets} · rest ${c.program.rest}`, `- Change exercises ${c.program.change}; ${c.program.structure}`, `- Methods: ${c.program.methods}`] : []),
     ...c.taNotes.map(n => "- " + n));
   L.push("", "ENERGY & MACROS",
@@ -1241,6 +1349,8 @@ function reportText() {
     `- Expenditure: ${c.tdee ? fmt(r50(c.tdee)) + " kcal" : "–"} (${c.blend === 1 ? "from intake + weight trend" : c.blend ? "blend of intake + trend and equation" : "equation estimate"})`,
     `- Rate: ${c.rateKg ? fmt(c.fromKg(c.rateKg), 2) + " " + u + "/week" : "maintain"}`,
     `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
+  L.push("", "BUILDING BLOCKS (block 1, 4-week stages)"); BUILDING_BLOCKS.forEach(b => { const why = blockPriority(b, c); L.push(`- ${b.area}${why.length ? " [PRIORITY: " + why.join(", ") + "]" : ""}: ${b.stages.join(" → ")}`); });
+  if (c.ramp && !c.ramp.ok) { L.push("", `PROTEIN RAMP-UP: ${c.ramp.current} → ${c.ramp.target} g/day`, "- " + c.ramp.steps.map(s => `${s.weeks}: ${s.g} g`).join(" · ")); c.ramp.actions.forEach(([k, v]) => L.push(`- ${k}: ${v}`)); c.ramp.tips.forEach(t => L.push("- " + t)); }
   L.push("", "NUTRITION PROTOCOL"); c.nutrition.forEach(([k, a, b]) => L.push(`- ${k}: ${a}${b ? " (" + b + ")" : ""}`));
   L.push("", `RECOVERY: ${c.recovery ?? "–"}/100`, "RECOVERY PROTOCOL"); c.recoveryPlan.forEach(([k, a, b]) => L.push(`- ${k}: ${a}${b ? " (" + b + ")" : ""}`));
   L.push("", `6-MONTH ROADMAP (${c.roadmap.totalWeeks} weeks)`); c.roadmap.rows.forEach(r => L.push(`- ${r.label} (${r.weeks}${r.date ? ", " + r.date : ""}): ${r.train} | ${r.nutr} | ${r.test}`));
@@ -1316,7 +1426,7 @@ const EXAMPLE = {
   prev_best: "Age 29, 4-day upper/lower and tracking macros. Around 175 lb.", prev_worked: "Upper/lower split, tracking food on weekdays.",
   prev_failed: "Running programs; stopped when my knees ached. Lost the routine when the second baby came.",
   grows: ["Quads", "Arms"], lagging: ["Chest", "Back", "Shoulders"], soreness: "1–2 days", joint_ache: "Sometimes",
-  tracks_food: "Track daily in an app", cal_avg: "2650", protein_avg: "120", track_conf: "Mostly estimates", wt_trend: "Gone up", wt_change: "3",
+  tracks_food: "Track daily in an app", cal_avg: "2650", protein_avg: "", track_conf: "Mostly estimates", wt_trend: "Gone up", wt_change: "3",
   typical_day: "Coffee only until 11. Lunch out (burrito bowl). Snacks at 3pm. Big dinner with family, then snacks after the kids are in bed. Beers on Fri/Sat.",
   meals: "3", pattern: ["Skip breakfast", "Eat late at night", "Overeat on weekends"], diet_style: "No particular diet", water: "1–2 L", alcohol: "4–7", caffeine: "3–4 cups",
   diet_count: "1–2", last_diet: "Over a year ago", wt_low: "172", wt_high: "195", food_rel: ["Eating when stressed"], cook: "Basic", prep_time: "1–3 h",
@@ -1326,7 +1436,7 @@ const EXAMPLE = {
   barriers: ["Time", "Family commitments", "Night eating"], streak: "1+ year", support: "Very supportive", checkin: "Weekly check-in", coach_style: "Explain the why",
   will_track: ["Daily morning weight", "Food (calories / macros)", "Training log", "Progress photos"],
   sb_cgb_w: "175", sb_cgb_r: "3", sb_incline_w: "155", sb_incline_r: "3", sb_dip_w: "45", sb_dip_r: "5", sb_chin_w: "25", sb_chin_r: "3", sb_dbpress_w: "50", sb_triext_w: "75", sb_triext_r: "6", sb_er_w: "12", sb_bsq_w: "255", sb_bsq_r: "3", sb_fsq_w: "185", sb_fsq_r: "3", sb_dl_w: "315", sb_dl_r: "3",
-  nut_pref: "Track calories & macros", first_meal: "10 am–noon", last_meal: "9–11 pm", hunger: "6", eat_speed: "Under 10 min",
+  protein_meals: "1", am_appetite: "Not hungry", shakes: "Yes", nut_pref: "Track calories & macros", first_meal: "10 am–noon", last_meal: "9–11 pm", hunger: "6", eat_speed: "Under 10 min",
   protein_src: ["Meat", "Poultry", "Eggs", "Protein powder"], veg: "2–3", fruit: "1–2", fish: "None", train_time: "4–7 pm", pre_wo: "Have a small snack",
   trigger_foods: ["Dairy"], weekend: "Very different",
   wake_time: "6–7 am", sleep_latency: "15–30 min", rested: "Some days", snore: "I snore", caff_cut: "2–5 pm", room: ["Dark", "Quiet"], naps: "Never", daylight: "Rarely",

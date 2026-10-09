@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Starting Point Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky step rail on the left, one section of questions at a time, barbell that loads a plate per finished section. */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --sunk: #e9ebe6;
+  --ink: #17201c;
+  --muted: #5c6862;
+  --line: #d4d9d3;
+  --accent: #1f4fa3;
+  --accent-ink: #ffffff;
+  --p-red: #c8322b;
+  --p-blue: #1f4fa3;
+  --p-yellow: #e2b007;
+  --p-green: #2e8b4e;
+  --p-white: #f4f4f0;
+  --p-edge: #1b1f1d;
+  --ok: #2e7d4f;
+  --warn: #a86a00;
+  --crit: #b3261e;
+  --ok-bg: #e3f1e8;
+  --warn-bg: #fbf0d9;
+  --crit-bg: #f9e2df;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101412; --surface: #181d1b; --sunk: #222826; --ink: #e7ebe8; --muted: #9aa69f; --line: #2e3633;
+    --accent: #7ea2ea; --accent-ink: #0d1424; --p-white: #dcdcd6; --p-edge: #0a0c0b;
+    --ok: #6cc591; --warn: #e3b14f; --crit: #f08a80; --ok-bg: #16291e; --warn-bg: #2d2412; --crit-bg: #33191a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101412; --surface: #181d1b; --sunk: #222826; --ink: #e7ebe8; --muted: #9aa69f; --line: #2e3633;
+  --accent: #7ea2ea; --accent-ink: #0d1424; --p-white: #dcdcd6; --p-edge: #0a0c0b;
+  --ok: #6cc591; --warn: #e3b14f; --crit: #f08a80; --ok-bg: #16291e; --warn-bg: #2d2412; --crit-bg: #33191a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; letter-spacing: .01em; text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-size: clamp(30px, 5vw, 44px); text-transform: uppercase; }
+h2 { font-size: 30px; text-transform: uppercase; }
+h3 { font-size: 20px; text-transform: uppercase; letter-spacing: .03em; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font: 500 11px/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding-block: 28px 18px; border-bottom: 1px solid var(--line); }
+header.top p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.tabs { display: flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: var(--r); }
+.tabs button { border: 0; background: transparent; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* barbell */
+.bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 16px; }
+.bar-row svg { flex: 1 1 320px; max-width: 520px; height: 64px; }
+.load { font: 500 13px/1.3 var(--f-mono); color: var(--muted); }
+.load b { font: 700 26px/1 var(--f-display); color: var(--ink); display: block; }
+
+/* layout */
+.grid { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 820px) { .grid { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+nav.steps { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 820px) { nav.steps { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 4px; } }
+nav.steps button { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 10px; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 4px; cursor: pointer; color: var(--muted); font-size: 14px; white-space: nowrap; }
+nav.steps button:hover { background: var(--sunk); }
+nav.steps button[aria-current="step"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line); }
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--p-edge); }
+.tick { font: 500 11px var(--f-mono); color: var(--ok); }
+
+/* section */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: clamp(18px, 3vw, 32px); min-width: 0; }
+.sec-head { display: flex; gap: 14px; align-items: flex-start; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.sec-head .plate { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--p-edge); display: grid; place-items: center; font: 700 13px var(--f-display); }
+.sec-head p { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+.fields { display: flex; flex-direction: column; }
+.field { padding-block: 16px; border-bottom: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.field:last-child { border-bottom: 0; }
+.field > label, .field > .lbl { font-weight: 600; font-size: 15px; }
+.req { color: var(--p-red); margin-left: 2px; }
+.help { color: var(--muted); font-size: 13px; margin-top: -4px; }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 24px; border-bottom: 1px dashed var(--line); }
+.row2 .field { border-bottom: 0; }
+.fields > .row2:last-child { border-bottom: 0; }
+input[type=text], input[type=email], input[type=tel], input[type=number], textarea {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px; width: 100%; max-width: 520px;
+}
+input[type=number] { max-width: 160px; font-family: var(--f-mono); }
+textarea { min-height: 84px; resize: vertical; max-width: 100%; }
+input:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.unit { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 14px; line-height: 1.3; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.scale { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 4px; max-width: 520px; }
+.scale .chip { padding: 7px 0; border-radius: 4px; text-align: center; font-family: var(--f-mono); font-size: 13px; }
+.scale-lbls { display: flex; justify-content: space-between; max-width: 520px; font-size: 12px; color: var(--muted); }
+
+/* injury + lifts tables */
+.inj { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.inj-row { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.inj-row:last-child { border-bottom: 0; }
+.inj-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.inj-top b { font-weight: 600; }
+.inj-detail { display: flex; flex-direction: column; gap: 10px; padding-left: 12px; border-left: 2px solid var(--p-yellow); }
+.tbl-wrap { overflow-x: auto; }
+table.lifts { border-collapse: collapse; min-width: 420px; }
+table.lifts th { text-align: left; font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 6px 10px 6px 0; }
+table.lifts td { padding: 6px 10px 6px 0; }
+table.lifts td:first-child { font-weight: 500; padding-right: 18px; white-space: nowrap; }
+table.lifts input { max-width: 96px; }
+.e1rm { font-family: var(--f-mono); color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.nav-btns { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 20px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--crit); }
+.utility { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+.note { background: var(--sunk); border-radius: var(--r); padding: 12px 14px; font-size: 14px; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 4px; font-size: 14px; z-index: 5; }
+
+/* report */
+.report { display: flex; flex-direction: column; gap: 20px; }
+.rep-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; }
+.rep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h3 { display: flex; align-items: center; gap: 8px; }
+.card h3 .dot { width: 12px; height: 12px; }
+.kv { display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr); gap: 6px 16px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; overflow-wrap: anywhere; }
+.big { font: 700 34px/1 var(--f-display); }
+.big small { font: 500 13px var(--f-mono); color: var(--muted); margin-left: 6px; }
+.flags { display: flex; flex-direction: column; gap: 8px; }
+.flag { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 4px; font-size: 14px; }
+.flag .pill { font: 500 10px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .1em; padding: 5px 7px; border-radius: 3px; color: var(--surface); margin-top: 1px; }
+.flag.crit { background: var(--crit-bg); } .flag.crit .pill { background: var(--crit); }
+.flag.warn { background: var(--warn-bg); } .flag.warn .pill { background: var(--warn); }
+.flag.ok { background: var(--ok-bg); } .flag.ok .pill { background: var(--ok); }
+.meter { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 4px; }
+ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 12px; font-size: 14px; align-items: center; }
+.ratio span:nth-child(3n+2) { font-family: var(--f-mono); }
+.tag { font: 500 11px var(--f-mono); padding: 3px 7px; border-radius: 3px; white-space: nowrap; }
+.tag.ok { background: var(--ok-bg); color: var(--ok); } .tag.warn { background: var(--warn-bg); color: var(--warn); } .tag.muted { background: var(--sunk); color: var(--muted); }
+.answers { display: flex; flex-direction: column; gap: 18px; }
+.answers h3 { font-size: 17px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.answers dl { display: grid; grid-template-columns: minmax(140px, 38%) minmax(0, 1fr); gap: 6px 18px; margin: 10px 0 0; font-size: 14px; }
+.answers dt { color: var(--muted); }
+.answers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .answers dl { grid-template-columns: minmax(0, 1fr); } .answers dd { margin-bottom: 6px; } }
+.example-banner { background: var(--warn-bg); color: var(--warn); border-radius: 4px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
+.empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+.empty h2 { color: var(--ink); margin-bottom: 8px; }
+@media (prefers-reduced-motion: no-preference) { .plate-g { transition: opacity .3s, transform .3s; } }
+@media print {
+  body { background: #fff; color: #000; padding: 0; }
+  header.top .tabs, .bar-row, nav.steps, .nav-btns, .utility, .no-print { display: none !important; }
+  .grid { display: block; }
+  .card, .panel { break-inside: avoid; border-color: #bbb; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="coachLine">New client intake</div>
+      <h1>Starting Point Assessment</h1>
+      <p>About 15 minutes. Your answers tell your coach where your training, nutrition and recovery start, so the first program fits you. Your progress saves in this browser as you go.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-form" aria-selected="true" data-view="form">Client form</button>
+      <button role="tab" id="tab-report" aria-selected="false" data-view="report">Coach report</button>
+    </div>
+  </header>
+
+  <section id="view-form">
+    <div class="bar-row">
+      <svg id="barbell" viewBox="0 0 520 64" role="img" aria-label="Progress barbell"></svg>
+      <div class="load"><b id="loadKg">20 kg</b><span id="loadTxt">empty bar · 0 of 8 sections</span></div>
+    </div>
+    <div class="grid">
+      <nav class="steps" id="steps" aria-label="Sections"></nav>
+      <div>
+        <form class="panel" id="panel" novalidate></form>
+        <div class="utility" style="margin-top:14px">
+          <button class="btn ghost" type="button" id="loadExample">Load an example client</button>
+          <button class="btn ghost danger" type="button" id="clearBtn">Clear all answers</button>
+          <span id="saveState"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-report" hidden></section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ---------- Coach settings: fill these in before sending the page to clients ---------- */
+const COACH = { name: "", email: "" };
+
+/* ---------- Questionnaire ---------- */
+const IMPERIAL = "Imperial (lb, ft/in)", METRIC = "Metric (kg, cm)";
+const isImp = d => d.units !== METRIC;
+const wu = d => isImp(d) ? "lb" : "kg";
+const YN = ["Yes", "No"];
+const MUSCLES = ["Chest", "Back", "Shoulders", "Arms", "Quads", "Hamstrings", "Glutes", "Calves", "Abs"];
+const GOALS = ["Lose body fat", "Build muscle", "Get stronger", "Recomp (lose fat, build muscle)", "Sport / performance", "Health & longevity", "Return from injury"];
+const PARQ = ["parq_heart", "parq_chest", "parq_dizzy", "parq_chronic", "parq_meds", "parq_bone", "parq_super"];
+const REGIONS = [["neck","Neck"],["shoulder","Shoulder"],["elbow","Elbow"],["wrist","Wrist / hand"],["upback","Upper back"],["lowback","Lower back"],["hip","Hip"],["knee","Knee"],["ankle","Ankle / foot"]];
+const LIFTS = [["squat","Back squat"],["bench","Bench press"],["dead","Deadlift"],["ohp","Overhead press"],["chin","Chin-up / pull-up (added weight)"],["fsquat","Front squat"]];
+
+const PLATES = [
+  { kg: 25, c: "--p-red" }, { kg: 20, c: "--p-blue" }, { kg: 15, c: "--p-yellow" }, { kg: 10, c: "--p-green" },
+  { kg: 5, c: "--p-white" }, { kg: 2.5, c: "--p-red" }, { kg: 2, c: "--p-blue" }, { kg: 1.5, c: "--p-yellow" }
+];
+
+const SECTIONS = [
+  { id: "about", title: "About you", intro: "The basics, plus how active your days are outside the gym. Height, weight and age feed the energy estimate.",
+    req: ["name", "email", "age", "sex", "wt"],
+    fields: [
+      { id: "name", label: "Full name", type: "text" },
+      { group: [
+        { id: "email", label: "Email", type: "email" },
+        { id: "phone", label: "Phone", type: "tel" } ] },
+      { id: "age", label: "Age", type: "number", unit: "years" },
+      { id: "sex", label: "Sex", help: "Used only in the calorie equation.", type: "chips", options: ["Male", "Female", "Prefer not to say"] },
+      { id: "units", label: "Units", type: "chips", options: [IMPERIAL, METRIC] },
+      { group: [
+        { id: "ht_ft", label: "Height", type: "number", unit: "ft", show: isImp },
+        { id: "ht_in", label: " ", type: "number", unit: "in", show: isImp },
+        { id: "ht_cm", label: "Height", type: "number", unit: "cm", show: d => !isImp(d) },
+        { id: "wt", label: "Current body weight", type: "number", unit: wu } ] },
+      { id: "occupation", label: "Occupation", type: "text" },
+      { id: "job_activity", label: "During work hours you are…", type: "chips", options: ["Mostly sitting", "Mixed sitting and standing", "On my feet most of the day", "Heavy physical work"] },
+      { id: "steps", label: "Average daily steps", help: "Check your phone or watch for the last 2 weeks if you can.", type: "chips", options: ["Under 4,000", "4,000–7,000", "7,000–10,000", "10,000–13,000", "Over 13,000", "Not sure"] }
+    ] },
+
+  { id: "goals", title: "Goals & schedule", intro: "What you want, why it matters now, and the time you can realistically give it.",
+    req: ["goal_primary", "days"],
+    fields: [
+      { id: "goal_primary", label: "Main goal", type: "chips", options: GOALS },
+      { id: "goal_secondary", label: "Anything else you'd like from training?", type: "multi", options: GOALS },
+      { id: "goal_specific", label: "What would success look like in 12 weeks?", help: "Be specific: a weight, a lift, a pant size, running a 5K without stopping.", type: "textarea" },
+      { id: "goal_why", label: "Why now?", type: "textarea" },
+      { group: [
+        { id: "goal_wt", label: "Goal body weight (optional)", type: "number", unit: wu },
+        { id: "deadline", label: "Event or date you're working toward", type: "text" } ] },
+      { id: "commit", label: "How ready are you to change your routine right now?", type: "scale", min: 1, max: 10, lo: "Not really", hi: "All in" },
+      { id: "days", label: "Days per week you can train", type: "chips", options: ["2", "3", "4", "5", "6"] },
+      { id: "session_len", label: "Time per session", type: "chips", options: ["30–45 min", "45–60 min", "60–75 min", "75–90 min", "90+ min"] },
+      { id: "equipment", label: "Where will you train?", type: "chips", options: ["Full commercial gym", "Home gym with rack & barbell", "Dumbbells / bands only", "Bodyweight only"] },
+      { id: "style_pref", label: "Training you enjoy", type: "multi", options: ["Barbell strength", "Bodybuilding", "Machines", "Conditioning / HIIT", "Running / endurance", "Classes", "Mobility / yoga"] },
+      { id: "dislikes", label: "Exercises or styles you dislike or won't do", type: "textarea" }
+    ] },
+
+  { id: "health", title: "Health screen", intro: "Based on the PAR-Q+ readiness questions. A \"yes\" doesn't rule you out; it means your coach may ask for medical clearance first.",
+    req: PARQ,
+    fields: [
+      { id: "parq_heart", label: "Has a doctor ever said you have a heart condition or high blood pressure?", type: "chips", options: YN },
+      { id: "parq_chest", label: "Do you feel pain in your chest at rest, during daily activities, or when you exercise?", type: "chips", options: YN },
+      { id: "parq_dizzy", label: "Do you lose balance from dizziness, or have you lost consciousness in the last 12 months?", type: "chips", options: YN },
+      { id: "parq_chronic", label: "Have you been diagnosed with another chronic medical condition?", type: "chips", options: YN },
+      { id: "parq_meds", label: "Do you take prescribed medication for a chronic medical condition?", type: "chips", options: YN },
+      { id: "parq_bone", label: "Do you have a bone, joint or soft-tissue problem that more activity could make worse?", type: "chips", options: YN },
+      { id: "parq_super", label: "Has a doctor ever said you should only do medically supervised physical activity?", type: "chips", options: YN },
+      { id: "cleared", label: "Has a doctor cleared you for exercise?", type: "chips", options: ["Yes, in writing", "Yes, verbally", "Not yet"], show: d => PARQ.some(k => d[k] === "Yes") },
+      { id: "conditions", label: "Diagnosed conditions", type: "multi", options: ["Type 1 diabetes", "Type 2 diabetes / prediabetes", "Thyroid condition", "Asthma", "High cholesterol", "PCOS", "Autoimmune condition", "Osteoporosis / osteopenia", "Anxiety / depression", "Digestive condition (IBS, IBD, celiac)", "None"] },
+      { id: "conditions_note", label: "Details or other conditions", type: "textarea" },
+      { id: "meds", label: "Medications and doses", type: "textarea" },
+      { id: "supps", label: "Supplements you take now", type: "textarea" },
+      { id: "pregnant", label: "Pregnancy", type: "chips", options: ["Not applicable", "Currently pregnant", "Postpartum (under 12 months)", "Trying to conceive"], show: d => d.sex === "Female" },
+      { id: "cycle", label: "Menstrual cycle", type: "chips", options: ["Regular", "Irregular", "Hormonal contraception", "Peri / post-menopause", "Prefer not to say"], show: d => d.sex === "Female" },
+      { group: [
+        { id: "bloodwork", label: "Last blood work", type: "chips", options: ["Within 12 months", "1–3 years ago", "Longer / never"] },
+        { id: "bp", label: "Last blood pressure reading, if known", type: "text" } ] },
+      { id: "smoke", label: "Smoking or vaping", type: "chips", options: ["Never", "Former", "Current smoker", "Vape"] }
+    ] },
+
+  { id: "injuries", title: "Injuries & pain", intro: "Mark anything that bothers you now or has in the past. Pain is on a 0–10 scale, where 0 is none and 10 is the worst imaginable.",
+    req: [],
+    fields: [
+      { id: "inj", label: "Body map", type: "injuries" },
+      { id: "surgeries", label: "Surgeries (what and when)", type: "textarea" },
+      { id: "pain_moves", label: "Movements that cause pain or that you avoid", type: "multi", options: ["Squatting", "Hinging / deadlifts", "Overhead pressing", "Bench / push-ups", "Pull-ups / hanging", "Lunges / stairs", "Running / jumping", "Long periods of sitting", "None"] },
+      { id: "physio", label: "Are you currently seeing a physio, chiro or doctor for any of these?", type: "chips", options: YN },
+      { id: "mobility", label: "Which of these can you do comfortably?", type: "multi", options: ["Touch toes with straight legs", "Squat to parallel with heels down", "Arms fully overhead without arching", "Balance on one leg for 30 s each side", "None of these"] }
+    ] },
+
+  { id: "training", title: "Training: now & before", intro: "What you do now, what you've done before, and how your body handles training. Lift numbers can be rough; a recent set you're sure of beats a lifetime best.",
+    req: ["train_age", "train_now"],
+    fields: [
+      { id: "train_age", label: "How long have you trained consistently?", type: "chips", options: ["Never consistently", "Under 6 months", "6–12 months", "1–2 years", "2–5 years", "5+ years"] },
+      { id: "train_now", label: "Training right now", type: "chips", options: ["Not training", "1–2 days/week", "3–4 days/week", "5+ days/week"] },
+      { id: "current_routine", label: "Describe your current week of training", help: "Split, main exercises, cardio. Paste from your app if that's easier.", type: "textarea" },
+      { id: "sets_now", label: "Roughly how many hard sets per muscle group per week?", type: "chips", options: ["Under 6", "6–10", "10–15", "15–20", "20+", "No idea"] },
+      { id: "rir", label: "How close to failure do your working sets usually end?", type: "chips", options: ["4+ reps left", "2–3 reps left", "0–1 reps left", "To failure", "Not sure"] },
+      { id: "logs", label: "Do you log your workouts?", type: "chips", options: ["Every session", "Sometimes", "Never"] },
+      { id: "lifts", label: "Recent best sets (last 3 months)", help: "Weight and reps for one hard set. For chin-ups, enter the added weight (0 if bodyweight).", type: "lifts" },
+      { id: "cardio", label: "Cardio per week", type: "chips", options: ["None", "1–2 times", "3–4 times", "5+ times"] },
+      { id: "cardio_type", label: "What kind of cardio, and how long?", type: "text" },
+      { id: "sports", label: "Sports background", type: "textarea" },
+      { id: "prev_best", label: "When were you in your best shape? What were you doing then?", type: "textarea" },
+      { id: "prev_worked", label: "Programs or approaches that worked well", type: "textarea" },
+      { id: "prev_failed", label: "What hasn't worked, and why did you stop?", type: "textarea" },
+      { id: "grows", label: "Muscles that grow easily for you", type: "multi", options: MUSCLES },
+      { id: "lagging", label: "Muscles you want to bring up", type: "multi", options: MUSCLES },
+      { id: "soreness", label: "After a hard session, soreness usually lasts", type: "chips", options: ["Rarely sore", "Under a day", "1–2 days", "3+ days"] },
+      { id: "joint_ache", label: "Do your joints ache when training volume goes up?", type: "chips", options: ["Never", "Sometimes", "Often"] }
+    ] },
+
+  { id: "nutrition", title: "Nutrition", intro: "No judgment here; this is the baseline we build from. If you track food, your recent intake and weight trend give the most accurate read of your real energy needs.",
+    req: ["tracks_food", "wt_trend"],
+    fields: [
+      { id: "tracks_food", label: "Food tracking", type: "chips", options: ["Track daily in an app", "Tracked before, not now", "Never tracked"] },
+      { group: [
+        { id: "cal_avg", label: "Average daily calories, last 2–4 weeks", type: "number", unit: "kcal", show: d => d.tracks_food === "Track daily in an app" },
+        { id: "protein_avg", label: "Average daily protein", type: "number", unit: "g", show: d => d.tracks_food === "Track daily in an app" } ] },
+      { id: "track_conf", label: "How accurate is that tracking?", type: "chips", options: ["I weigh nearly everything", "Mostly estimates", "Rough guess"], show: d => d.tracks_food === "Track daily in an app" },
+      { id: "wt_trend", label: "Over the last 4 weeks your weight has…", type: "chips", options: ["Gone down", "Stayed about the same", "Gone up", "Not sure"] },
+      { id: "wt_change", label: "By about how much?", type: "number", unit: wu, show: d => d.wt_trend === "Gone down" || d.wt_trend === "Gone up" },
+      { id: "typical_day", label: "Walk through a typical day of eating", help: "Times, meals, snacks, drinks. Weekends too if they're different.", type: "textarea" },
+      { id: "meals", label: "Meals per day", type: "chips", options: ["1–2", "3", "4", "5+"] },
+      { id: "pattern", label: "Which of these fit you?", type: "multi", options: ["Skip breakfast", "Snack often", "Eat late at night", "Eat out 3+ times a week", "Intermittent fasting", "Overeat on weekends", "Cook most meals"] },
+      { id: "diet_style", label: "Eating style", type: "chips", options: ["No particular diet", "Vegetarian", "Vegan", "Pescatarian", "Low carb / keto", "Halal / kosher", "Other"] },
+      { group: [
+        { id: "allergies", label: "Food allergies or intolerances", type: "text" },
+        { id: "dislike_foods", label: "Foods you won't eat", type: "text" } ] },
+      { id: "water", label: "Water per day", type: "chips", options: ["Under 1 L", "1–2 L", "2–3 L", "3 L+"] },
+      { id: "alcohol", label: "Alcoholic drinks per week", type: "chips", options: ["None", "1–3", "4–7", "8–14", "15+"] },
+      { id: "caffeine", label: "Coffee / caffeine per day", type: "chips", options: ["None", "1–2 cups", "3–4 cups", "5+ cups"] },
+      { id: "diet_count", label: "How many serious diets have you done?", type: "chips", options: ["None", "1–2", "3–5", "6+"] },
+      { id: "last_diet", label: "Your most recent diet", type: "chips", options: ["I'm dieting now", "Ended within 3 months", "Ended 3–12 months ago", "Over a year ago", "Never dieted"] },
+      { id: "diet_weeks", label: "How many weeks into this diet are you?", type: "number", unit: "weeks", show: d => d.last_diet === "I'm dieting now" },
+      { group: [
+        { id: "wt_low", label: "Lowest adult weight", type: "number", unit: wu },
+        { id: "wt_high", label: "Highest adult weight", type: "number", unit: wu } ] },
+      { id: "food_rel", label: "Do any of these feel familiar?", help: "Optional, and only your coach sees it.", type: "multi", options: ["Feeling out of control around food", "Eating when stressed", "Guilt after eating", "All-or-nothing dieting", "History of an eating disorder", "None of these"] },
+      { group: [
+        { id: "cook", label: "Cooking", type: "chips", options: ["Can't cook", "Basic", "Comfortable", "Love it"] },
+        { id: "prep_time", label: "Time for food prep per week", type: "chips", options: ["Under 1 h", "1–3 h", "3 h+"] } ] }
+    ] },
+
+  { id: "recovery", title: "Sleep, stress & recovery", intro: "Results come from the training you recover from. Sleep, stress, energy and digestion decide how hard we can push at the start.",
+    req: ["sleep_hrs", "sleep_q", "stress", "energy"],
+    fields: [
+      { id: "sleep_hrs", label: "Sleep per night", type: "chips", options: ["Under 5 h", "5–6 h", "6–7 h", "7–8 h", "8+ h"] },
+      { id: "sleep_q", label: "Sleep quality", type: "scale", min: 1, max: 10, lo: "Poor", hi: "Excellent" },
+      { group: [
+        { id: "bed_wake", label: "Usual bed and wake times", type: "text" },
+        { id: "wake_night", label: "Wake during the night?", type: "chips", options: ["Rarely", "Once", "2+ times", "Same time most nights"] } ] },
+      { id: "screens", label: "Screens in the hour before bed?", type: "chips", options: YN },
+      { id: "stress", label: "Overall stress", type: "scale", min: 1, max: 10, lo: "Calm", hi: "Overwhelmed" },
+      { id: "stress_src", label: "Main sources of stress", type: "multi", options: ["Work", "Family", "Finances", "Health", "Relationships", "School", "None"] },
+      { id: "energy", label: "Daily energy", type: "scale", min: 1, max: 10, lo: "Drained", hi: "Energetic" },
+      { id: "energy_dip", label: "When does your energy dip?", type: "multi", options: ["On waking", "Mid-morning", "After lunch", "Late afternoon", "Evening", "No dips"] },
+      { id: "mood", label: "Mood lately", type: "scale", min: 1, max: 10, lo: "Low", hi: "Great" },
+      { id: "digestion", label: "Digestion", type: "multi", options: ["Regular daily bowel movements", "Bloating", "Gas after meals", "Heartburn / reflux", "Constipation", "Loose stools", "No issues"] },
+      { id: "cravings", label: "Regular cravings", type: "multi", options: ["Sugar", "Salt", "Bread / carbs", "Caffeine", "None"] },
+      { id: "cold", label: "Often cold hands or feet?", type: "chips", options: YN },
+      { id: "schedule", label: "Work schedule", type: "chips", options: ["Regular days", "Shift work", "Night shifts", "Frequent travel"] }
+    ] },
+
+  { id: "habits", title: "Habits & coaching", intro: "What you already do well, what got in the way before, and how you'd like to work together.",
+    req: ["consent"],
+    fields: [
+      { id: "habits_now", label: "Already doing consistently", type: "multi", options: ["Training 3+ times a week", "7+ hours of sleep", "Protein at most meals", "8,000+ steps", "Vegetables daily", "Limiting alcohol", "Meal prep", "None yet"] },
+      { id: "habits_past", label: "Habits you built before that stuck. What made them stick?", type: "textarea" },
+      { id: "habits_lost", label: "Habits you've lost since then", type: "textarea" },
+      { id: "barriers", label: "What usually gets in the way?", type: "multi", options: ["Time", "Motivation", "Travel", "Family commitments", "Injury or pain", "Not knowing what to do", "Cost", "Social events", "Night eating", "Shift work"] },
+      { id: "streak", label: "Longest stretch you've trained consistently", type: "chips", options: ["Under 1 month", "1–3 months", "3–12 months", "1+ year"] },
+      { id: "support", label: "Support at home", type: "chips", options: ["Very supportive", "Neutral", "Not supportive"] },
+      { id: "checkin", label: "How do you want to check in?", type: "chips", options: ["Daily messages", "Weekly check-in", "Every two weeks", "Video calls"] },
+      { id: "coach_style", label: "Coaching style that works for you", type: "chips", options: ["Tell me exactly what to do", "Explain the why", "Give me options"] },
+      { id: "will_track", label: "What are you willing to track?", type: "multi", options: ["Daily morning weight", "Food (calories / macros)", "Steps", "Training log", "Progress photos", "Measurements", "Sleep"] },
+      { id: "anything", label: "Anything else your coach should know?", type: "textarea" },
+      { id: "consent", label: "Confirmation", type: "multi", options: ["My answers are accurate, and I'll tell my coach about any change in my health. I understand this isn't medical advice."] }
+    ] }
+];
+
+/* ---------- State ---------- */
+const STORE_KEY = "starting-point-intake-v1";
+let data = { units: IMPERIAL };
+let step = 0;
+let isExample = false;
+try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); if (s && s.data) { data = s.data; step = s.step || 0; isExample = !!s.example; } } catch (e) {}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ data, step, example: isExample })); $("#saveState").textContent = "Saved in this browser"; }
+  catch (e) { $("#saveState").textContent = "This browser can't save progress; finish in one sitting"; }
+}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const filled = v => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.length);
+const num = v => { if (v === "" || v == null) return null; const n = parseFloat(v); return isFinite(n) ? n : null; };
+const flat = fs => fs.flatMap(f => f.group ? f.group : [f]);
+const SHOW = {};
+
+/* ---------- Rendering the form ---------- */
+function fieldHTML(f) {
+  if (f.show) SHOW[f.id] = f.show;
+  const unit = typeof f.unit === "function" ? f.unit(data) : f.unit;
+  const sec = SECTIONS[step];
+  const req = sec.req.includes(f.id) ? '<span class="req" aria-hidden="true">*</span>' : "";
+  const help = f.help ? `<div class="help">${esc(f.help)}</div>` : "";
+  const v = data[f.id];
+  const lbl = `<label for="f-${f.id}">${esc(f.label)}${req}</label>`;
+  const lblDiv = `<div class="lbl" id="l-${f.id}">${esc(f.label)}${req}</div>`;
+  let body = "";
+  switch (f.type) {
+    case "text": case "email": case "tel":
+      return wrap(f, lbl + help + `<input id="f-${f.id}" type="${f.type}" data-f="${f.id}" value="${esc(v)}" autocomplete="off">`);
+    case "number":
+      return wrap(f, lbl + help + `<span class="unit"><input id="f-${f.id}" type="number" inputmode="decimal" step="any" data-f="${f.id}" value="${esc(v)}"><span data-unit="${f.id}">${esc(unit || "")}</span></span>`);
+    case "textarea":
+      return wrap(f, lbl + help + `<textarea id="f-${f.id}" data-f="${f.id}">${esc(v)}</textarea>`);
+    case "chips": case "multi":
+      body = f.options.map(o => {
+        const on = f.type === "multi" ? (v || []).includes(o) : v === o;
+        return `<button type="button" class="chip" data-chip="${f.id}" data-multi="${f.type === "multi" ? 1 : 0}" data-v="${esc(o)}" aria-pressed="${on}">${esc(o)}</button>`;
+      }).join("");
+      return wrap(f, lblDiv + help + `<div class="chips" role="group" aria-labelledby="l-${f.id}" id="f-${f.id}">${body}</div>`);
+    case "scale": {
+      const n = f.max - f.min + 1;
+      for (let i = f.min; i <= f.max; i++) body += `<button type="button" class="chip" data-chip="${f.id}" data-multi="0" data-v="${i}" aria-pressed="${String(v) === String(i)}">${i}</button>`;
+      return wrap(f, lblDiv + help + `<div class="scale" style="--n:${n}" role="group" aria-labelledby="l-${f.id}" id="f-${f.id}">${body}</div><div class="scale-lbls"><span>${esc(f.lo)}</span><span>${esc(f.hi)}</span></div>`);
+    }
+    case "injuries":
+      body = REGIONS.map(([k, name]) => {
+        const st = data["inj_" + k] || "None";
+        SHOW["injd_" + k] = d => (d["inj_" + k] || "None") !== "None";
+        const chips = ["None", "Past", "Current"].map(o => `<button type="button" class="chip" data-chip="inj_${k}" data-multi="0" data-v="${o}" aria-pressed="${st === o}">${o}</button>`).join("");
+        const side = ["Left", "Right", "Both", "Centre"].map(o => `<button type="button" class="chip" data-chip="inj_${k}_side" data-multi="0" data-v="${o}" aria-pressed="${data["inj_" + k + "_side"] === o}">${o}</button>`).join("");
+        let pain = "";
+        for (let i = 0; i <= 10; i++) pain += `<button type="button" class="chip" data-chip="inj_${k}_pain" data-multi="0" data-v="${i}" aria-pressed="${String(data["inj_" + k + "_pain"]) === String(i)}">${i}</button>`;
+        return `<div class="inj-row"><div class="inj-top"><b>${name}</b><div class="chips">${chips}</div></div>
+          <div class="inj-detail" data-show="injd_${k}">
+            <div class="chips" aria-label="${name} side">${side}</div>
+            <div><div class="help" style="margin:0 0 6px">Pain right now (0–10)</div><div class="scale" style="--n:11">${pain}</div></div>
+            <input type="text" data-f="inj_${k}_note" id="f-inj_${k}_note" placeholder="What happened, what makes it worse, what helps" value="${esc(data["inj_" + k + "_note"])}" aria-label="${name} notes">
+          </div></div>`;
+      }).join("");
+      return wrap(f, lblDiv + help + `<div class="inj">${body}</div>`);
+    case "lifts":
+      body = LIFTS.map(([k, name]) => `<tr><td>${name}</td>
+        <td><input type="number" inputmode="decimal" step="any" data-f="lift_${k}_w" id="f-lift_${k}_w" value="${esc(data["lift_" + k + "_w"])}" aria-label="${name} weight"></td>
+        <td><input type="number" inputmode="numeric" step="1" min="1" data-f="lift_${k}_r" id="f-lift_${k}_r" value="${esc(data["lift_" + k + "_r"])}" aria-label="${name} reps"></td>
+        <td class="e1rm" data-e1rm="${k}"></td></tr>`).join("");
+      return wrap(f, lblDiv + help + `<div class="tbl-wrap"><table class="lifts"><thead><tr><th>Lift</th><th>Weight (<span data-unit="lifts">${wu(data)}</span>)</th><th>Reps</th><th>Est. 1RM</th></tr></thead><tbody>${body}</tbody></table></div>
+        <span class="unit">Max strict bodyweight pull-ups <input type="number" inputmode="numeric" data-f="pullups" id="f-pullups" value="${esc(data.pullups)}" style="max-width:90px"></span>`);
+  }
+}
+function wrap(f, inner) { return `<div class="field" data-field="${f.id}"${f.show ? ` data-show="${f.id}"` : ""}>${inner}</div>`; }
+
+function renderSteps() {
+  const nav = $("#steps");
+  nav.innerHTML = SECTIONS.map((s, i) => `<button type="button" data-step="${i}" ${i === step ? 'aria-current="step"' : ""}>
+      <span class="dot" style="background:var(${PLATES[i].c})"></span><span>${s.title}</span><span class="tick">${complete(i) ? "✓" : ""}</span></button>`).join("")
+    + `<button type="button" data-step="${SECTIONS.length}" ${step === SECTIONS.length ? 'aria-current="step"' : ""}><span class="dot" style="background:var(--sunk)"></span><span>Review & send</span><span></span></button>`;
+}
+function renderPanel() {
+  const panel = $("#panel");
+  for (const k in SHOW) delete SHOW[k];
+  if (step === SECTIONS.length) { panel.innerHTML = reviewHTML(); bindReview(); return; }
+  const s = SECTIONS[step], p = PLATES[step];
+  const fields = s.fields.map(f => f.group ? `<div class="row2">${f.group.map(fieldHTML).join("")}</div>` : fieldHTML(f)).join("");
+  panel.innerHTML = `<div class="sec-head"><div class="plate" style="background:var(${p.c});color:${p.c === "--p-white" || p.c === "--p-yellow" ? "#1b1f1d" : "#fff"}">${p.kg}</div>
+      <div><div class="eyebrow">Section ${step + 1} of ${SECTIONS.length}</div><h2>${s.title}</h2><p>${esc(s.intro)}</p></div></div>
+    <div class="fields">${fields}</div>
+    <div class="nav-btns">
+      <button type="button" class="btn" data-go="-1" ${step === 0 ? "disabled style=\"visibility:hidden\"" : ""}>Back</button>
+      <button type="button" class="btn primary" data-go="1">${step === SECTIONS.length - 1 ? "Review answers" : "Next: " + SECTIONS[step + 1].title}</button>
+    </div>`;
+  updateVisibility(); updateE1rm();
+}
+function updateVisibility() {
+  document.querySelectorAll("[data-show]").forEach(el => { const fn = SHOW[el.dataset.show]; if (fn) el.hidden = !fn(data); });
+  document.querySelectorAll("[data-unit]").forEach(el => {
+    const id = el.dataset.unit; if (id === "lifts") { el.textContent = wu(data); return; }
+    const f = flat(SECTIONS.flatMap(s => s.fields)).find(x => x.id === id);
+    if (f && typeof f.unit === "function") el.textContent = f.unit(data);
+  });
+}
+function updateE1rm() {
+  document.querySelectorAll("[data-e1rm]").forEach(el => {
+    const k = el.dataset.e1rm, e = e1rm(k, data);
+    el.textContent = e ? `${Math.round(e)} ${wu(data)}` : "–";
+  });
+}
+function complete(i) {
+  const s = SECTIONS[i];
+  if (s.req.length) return s.req.every(k => filled(data[k]));
+  return Object.keys(data).some(k => k.startsWith("inj_") || ["surgeries", "pain_moves", "physio", "mobility"].includes(k));
+}
+function renderBar() {
+  const svg = $("#barbell");
+  const done = SECTIONS.map((_, i) => complete(i));
+  let x = 150, out = "";
+  // bar + sleeves
+  out += `<rect x="20" y="29" width="480" height="6" rx="3" fill="var(--muted)"/><rect x="138" y="22" width="8" height="20" rx="2" fill="var(--muted)"/><rect x="374" y="22" width="8" height="20" rx="2" fill="var(--muted)"/>`;
+  const heights = [56, 52, 46, 40, 32, 26, 22, 18], widths = [14, 12, 11, 10, 9, 8, 7, 6];
+  let xr = 370;
+  PLATES.forEach((p, i) => {
+    const h = heights[i], w = widths[i], y = 32 - h / 2, on = done[i];
+    const style = on ? `fill="var(${p.c})" stroke="var(--p-edge)"` : `fill="none" stroke="var(--line)" stroke-dasharray="3 3"`;
+    out += `<g class="plate-g"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ${style} stroke-width="1.2"/><rect x="${xr - w}" y="${y}" width="${w}" height="${h}" rx="2" ${style} stroke-width="1.2"/></g>`;
+    x += w + 2; xr -= w + 2;
+  });
+  svg.innerHTML = out;
+  const kg = 20 + PLATES.reduce((a, p, i) => a + (done[i] ? p.kg * 2 : 0), 0);
+  const n = done.filter(Boolean).length;
+  $("#loadKg").textContent = `${kg % 1 ? kg.toFixed(1) : kg} kg`;
+  $("#loadTxt").textContent = n === SECTIONS.length ? "fully loaded · ready to send" : `${n ? "loaded" : "empty bar"} · ${n} of ${SECTIONS.length} sections`;
+}
+function render() { renderSteps(); renderPanel(); renderBar(); }
+
+/* ---------- Events ---------- */
+document.addEventListener("click", e => {
+  const chip = e.target.closest("[data-chip]");
+  if (chip) {
+    const id = chip.dataset.chip, v = chip.dataset.v;
+    if (chip.dataset.multi === "1") {
+      const arr = new Set(data[id] || []);
+      const exclusive = /^(None|None of these|None yet|No issues|No dips)$/;
+      if (arr.has(v)) arr.delete(v); else {
+        if (exclusive.test(v)) arr.clear(); else [...arr].forEach(a => exclusive.test(a) && arr.delete(a));
+        arr.add(v);
+      }
+      data[id] = [...arr];
+      chip.parentElement.querySelectorAll("[data-chip]").forEach(c => c.setAttribute("aria-pressed", data[id].includes(c.dataset.v)));
+    } else {
+      data[id] = data[id] === v ? "" : v;
+      chip.parentElement.querySelectorAll("[data-chip]").forEach(c => c.setAttribute("aria-pressed", c.dataset.v === data[id]));
+    }
+    changed(); return;
+  }
+  const st = e.target.closest("[data-step]");
+  if (st) { step = +st.dataset.step; save(); render(); window.scrollTo({ top: 0 }); return; }
+  const go = e.target.closest("[data-go]");
+  if (go) { step = Math.max(0, Math.min(SECTIONS.length, step + +go.dataset.go)); save(); render(); window.scrollTo({ top: 0 }); return; }
+  const tab = e.target.closest("[data-view]");
+  if (tab) setView(tab.dataset.view);
+});
+document.addEventListener("input", e => {
+  const el = e.target.closest("[data-f]"); if (!el) return;
+  data[el.dataset.f] = el.value; changed(true);
+});
+$("#panel").addEventListener("submit", e => e.preventDefault());
+function changed(fromTyping) {
+  if (isExample) { isExample = false; }
+  save(); updateVisibility(); updateE1rm(); renderBar();
+  if (!fromTyping) renderSteps(); else document.querySelectorAll("#steps .tick").forEach((t, i) => t.textContent = complete(i) ? "✓" : "");
+}
+let clearArmed = false;
+$("#clearBtn").addEventListener("click", () => {
+  if (!clearArmed) { clearArmed = true; $("#clearBtn").textContent = "Click again to clear everything"; setTimeout(() => { clearArmed = false; $("#clearBtn").textContent = "Clear all answers"; }, 4000); return; }
+  clearArmed = false; $("#clearBtn").textContent = "Clear all answers";
+  data = { units: IMPERIAL }; step = 0; isExample = false; save(); render(); toast("Answers cleared");
+});
+$("#loadExample").addEventListener("click", () => { data = JSON.parse(JSON.stringify(EXAMPLE)); isExample = true; step = 0; save(); render(); toast("Example client loaded"); });
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
+
+/* ---------- Calculations ---------- */
+function e1rm(k, d) {
+  const w = num(d["lift_" + k + "_w"]), r = num(d["lift_" + k + "_r"]);
+  if (w == null || !r || r < 1 || r > 20) return null;
+  const load = k === "chin" ? (num(d.wt) || 0) + w : w;
+  if (!load) return null;
+  return r === 1 ? load : load * (1 + r / 30); // Epley
+}
+const pct = (a, b) => (a != null && b) ? a / b : null;
+const r50 = x => Math.round(x / 50) * 50;
+
+function calc(d) {
+  const imp = isImp(d), toKg = x => x == null ? null : imp ? x * 0.45359237 : x, fromKg = x => imp ? x / 0.45359237 : x;
+  const kg = toKg(num(d.wt));
+  const cm = imp ? ((num(d.ht_ft) || 0) * 30.48 + (num(d.ht_in) || 0) * 2.54) || null : num(d.ht_cm);
+  const age = num(d.age);
+  const bmi = kg && cm ? kg / ((cm / 100) ** 2) : null;
+  const sexAdj = d.sex === "Male" ? 5 : d.sex === "Female" ? -161 : -78;
+  const bmr = kg && cm && age ? 10 * kg + 6.25 * cm - 5 * age + sexAdj : null;
+  const stepM = { "Under 4,000": 1.25, "4,000–7,000": 1.35, "7,000–10,000": 1.45, "10,000–13,000": 1.55, "Over 13,000": 1.65 }[d.steps] ?? 1.35;
+  const jobA = { "Mostly sitting": 0, "Mixed sitting and standing": 0.05, "On my feet most of the day": 0.1, "Heavy physical work": 0.2 }[d.job_activity] || 0;
+  const trA = { "1–2 days/week": 0.05, "3–4 days/week": 0.1, "5+ days/week": 0.15 }[d.train_now] || 0;
+  const mult = Math.min(2.1, stepM + jobA + trA);
+  const tdeeEst = bmr ? bmr * mult : null;
+
+  // Intake + weight trend: expenditure = intake − stored energy change (≈7,700 kcal per kg over 28 days)
+  let tdeeObs = null, obsNote = "";
+  const cal = num(d.cal_avg);
+  if (cal && ["Gone down", "Stayed about the same", "Gone up"].includes(d.wt_trend)) {
+    const ch = d.wt_trend === "Stayed about the same" ? 0 : (toKg(num(d.wt_change)) || 0) * (d.wt_trend === "Gone down" ? -1 : 1);
+    tdeeObs = cal - ch * 7700 / 28;
+    obsNote = d.track_conf === "Rough guess" ? "rough tracking" : d.track_conf === "Mostly estimates" ? "estimated tracking" : "careful tracking";
+  }
+  // Careful logs are trusted outright; estimated logs usually under-count, so blend with the equation
+  const blend = !(tdeeObs > 1000) || d.track_conf === "Rough guess" ? 0 : d.track_conf === "I weigh nearly everything" || !tdeeEst ? 1 : 0.6;
+  const useObs = blend > 0;
+  const tdee = blend ? blend * tdeeObs + (1 - blend) * (tdeeEst || 0) : tdeeEst;
+
+  // Training level: the lower of experience and strength
+  const ageIdx = { "Never consistently": 0, "Under 6 months": 0, "6–12 months": 0, "1–2 years": 1, "2–5 years": 1, "5+ years": 2 }[d.train_age];
+  const fem = d.sex === "Female" ? 0.7 : 1;
+  const TH = { squat: [1.25, 1.75], bench: [0.9, 1.3], dead: [1.5, 2.2] };
+  const lifts = {}; LIFTS.forEach(([k]) => lifts[k] = e1rm(k, d));
+  const bw = num(d.wt);
+  const strScores = Object.entries(TH).filter(([k]) => lifts[k] && bw).map(([k, [i, a]]) => { const r = lifts[k] / bw; return r >= a * fem ? 2 : r >= i * fem ? 1 : 0; });
+  const strIdx = strScores.length ? Math.round(strScores.reduce((a, b) => a + b, 0) / strScores.length) : null;
+  let level = ageIdx ?? null;
+  if (level != null && strIdx != null) level = Math.min(level, strIdx);
+  const LEVELS = ["Beginner", "Intermediate", "Advanced"];
+
+  // Recovery capacity
+  const parts = [];
+  const sl = { "Under 5 h": 0, "5–6 h": 0.3, "6–7 h": 0.6, "7–8 h": 0.9, "8+ h": 1 }[d.sleep_hrs]; if (sl != null) parts.push(sl);
+  if (num(d.sleep_q)) parts.push((num(d.sleep_q) - 1) / 9);
+  if (num(d.stress)) parts.push((10 - num(d.stress)) / 9);
+  if (num(d.energy)) parts.push((num(d.energy) - 1) / 9);
+  const dig = (d.digestion || []).filter(x => !["Regular daily bowel movements", "No issues"].includes(x));
+  if ((d.digestion || []).length) parts.push(Math.max(0.2, 1 - dig.length * 0.25));
+  const so = { "Rarely sore": 0.9, "Under a day": 1, "1–2 days": 0.75, "3+ days": 0.4 }[d.soreness]; if (so != null) parts.push(so);
+  const recovery = parts.length >= 3 ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length * 100) : null;
+
+  // Starting volume near the low end of productive volume, then add sets across the block
+  let vol = null;
+  if (level != null) {
+    let base = [6, 8, 10][level];
+    if (recovery != null) base += recovery < 50 ? -2 : recovery >= 75 ? 2 : 0;
+    if (d.joint_ache === "Often") base -= 2;
+    const len = d.session_len; if (len === "30–45 min") base = Math.min(base, 8);
+    vol = Math.max(4, base);
+  }
+  const days = num(d.days);
+  const SPLITS = { 2: "Full body × 2", 3: "Full body × 3", 4: "Upper / Lower × 2", 5: "Upper / Lower + Push / Pull / Legs", 6: "Push / Pull / Legs × 2" };
+  const split = days ? SPLITS[days] : null;
+
+  // Energy target by goal
+  const g = d.goal_primary || "";
+  let ratePct = 0, phase = "Maintenance";
+  const dietWeeks = num(d.diet_weeks);
+  const dietFatigue = d.last_diet === "I'm dieting now" && dietWeeks != null && dietWeeks >= 12;
+  if (g === "Lose body fat") { ratePct = bmi && bmi >= 30 ? -0.75 : -0.5; phase = "Fat loss"; }
+  else if (g === "Build muscle") { ratePct = [0.5, 0.35, 0.25][level ?? 0]; phase = "Lean gain"; }
+  else if (g === "Get stronger") { ratePct = 0.1; phase = "Maintenance to slight surplus"; }
+  if (dietFatigue && ratePct < 0) { ratePct = 0; phase = "Maintenance break first"; }
+  if (d.pregnant === "Currently pregnant" || d.pregnant === "Postpartum (under 12 months)") { ratePct = Math.max(0, ratePct); phase = "Maintenance (pregnancy / postpartum)"; }
+  const eatingFlag = (d.food_rel || []).some(x => ["History of an eating disorder", "Feeling out of control around food"].includes(x));
+  if (eatingFlag && ratePct < -0.5) ratePct = -0.5;
+  let target = null, rateKg = null, macros = null;
+  if (tdee && kg) {
+    rateKg = kg * ratePct / 100;
+    target = Math.max(bmr ? bmr : 1200, tdee + rateKg * 7700 / 7);
+    const refKg = bmi && bmi >= 30 && cm ? 25 * (cm / 100) ** 2 : kg;
+    const p = Math.round(refKg * 2.0 / 5) * 5;
+    const f = Math.round(Math.max(0.6 * refKg, 0.28 * target / 9) / 5) * 5;
+    const c = Math.max(0, Math.round((target - p * 4 - f * 9) / 4 / 5) * 5);
+    macros = { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2) };
+  }
+
+  // Structural balance (reference ratios between lifts)
+  const RATIOS = [
+    ["Overhead press ÷ bench", pct(lifts.ohp, lifts.bench), 0.6, 0.7],
+    ["Chin-up (incl. body weight) ÷ bench", pct(lifts.chin, lifts.bench), 0.95, 1.2],
+    ["Front squat ÷ back squat", pct(lifts.fsquat, lifts.squat), 0.8, 0.9],
+    ["Back squat ÷ deadlift", pct(lifts.squat, lifts.dead), 0.8, 0.9]
+  ].filter(r => r[1] != null);
+
+  // Flags
+  const flags = [];
+  const parqYes = PARQ.filter(k => d[k] === "Yes");
+  if (parqYes.length) flags.push(["crit", d.cleared && d.cleared !== "Not yet" ? `PAR-Q: ${parqYes.length} “yes” answer(s); client reports clearance (${d.cleared.toLowerCase()}). Keep it on file.` : `PAR-Q: ${parqYes.length} “yes” answer(s). Get medical clearance before starting.`]);
+  if (d.pregnant === "Currently pregnant" || d.pregnant === "Postpartum (under 12 months)") flags.push(["crit", `${d.pregnant}. Program for pregnancy / postpartum and confirm clearance.`]);
+  if ((d.food_rel || []).includes("History of an eating disorder")) flags.push(["crit", "History of an eating disorder. Avoid aggressive deficits and close food tracking; consider working with a dietitian or therapist."]);
+  else if ((d.food_rel || []).includes("Feeling out of control around food")) flags.push(["warn", "Feels out of control around food. Start with structure (regular meals, protein) before a deficit."]);
+  const hurt = REGIONS.filter(([k]) => d["inj_" + k] === "Current").map(([k, n]) => [n, num(d["inj_" + k + "_pain"]) ?? 0, d["inj_" + k + "_side"]]);
+  hurt.forEach(([n, p, side]) => flags.push([p >= 5 ? "crit" : "warn", `${n}${side ? ` (${side.toLowerCase()})` : ""}: current pain ${p}/10. ${p >= 5 ? "Refer out or assess before loading the area." : "Modify painful patterns; keep pain at or below 3/10 during and after training."}`]));
+  if (d.physio === "Yes") flags.push(["warn", "Seeing a clinician now. Ask for their restrictions and coordinate."]);
+  if (dietFatigue) flags.push(["warn", `${dietWeeks} weeks into a diet. Run 2–4 weeks at maintenance before more fat loss.`]);
+  if (["Under 5 h", "5–6 h"].includes(d.sleep_hrs)) flags.push(["warn", `Sleeping ${d.sleep_hrs.replace(" h", " hours")}. Expect slower recovery; keep volume conservative.`]);
+  if (num(d.stress) >= 8) flags.push(["warn", `Stress ${d.stress}/10. Keep the first block simple and the deficit small.`]);
+  if (["8–14", "15+"].includes(d.alcohol)) flags.push(["warn", `${d.alcohol} drinks a week. Affects sleep, recovery and intake.`]);
+  if (d.joint_ache === "Often") flags.push(["warn", "Joints often ache as volume rises. Start low and add sets slowly."]);
+  if (d.wake_night === "Same time most nights") flags.push(["warn", "Wakes at the same time most nights. Look at evening food, alcohol, caffeine timing and stress."]);
+  if (!flags.length && Object.keys(d).length > 6) flags.push(["ok", "No medical or injury flags reported. Clear to start."]);
+
+  // First habits to build
+  const habits = [];
+  if (["Under 5 h", "5–6 h", "6–7 h"].includes(d.sleep_hrs)) habits.push("Sleep: fixed wake time and 7+ hours in bed, screens off 30–60 min before.");
+  if (macros && (num(d.protein_avg) == null ? !(d.habits_now || []).includes("Protein at most meals") : num(d.protein_avg) < macros.p * 0.8)) {
+    const m = { "1–2": 2, "3": 3, "4": 4, "5+": 5 }[d.meals] || 4; habits.push(`Protein: about ${Math.round(macros.p / m / 5) * 5} g at each of ${m} meals (${macros.p} g/day).`);
+  }
+  if (["Under 4,000", "4,000–7,000"].includes(d.steps)) habits.push("Steps: add 2,000 a day to the current average, then build to 8,000+.");
+  if (dig.length) habits.push("Digestion: sort out bloating and regularity first (slower meals, fibre, trial removal of trigger foods).");
+  if (["Under 1 L", "1–2 L"].includes(d.water)) habits.push("Water: about 2–3 L a day, more on training days.");
+  if (["4–7", "8–14", "15+"].includes(d.alcohol)) habits.push("Alcohol: set a weekly cap and keep it off training nights.");
+  if ((d.will_track || []).includes("Daily morning weight")) habits.push("Weigh in every morning; judge progress on the weekly average trend, not single days.");
+  if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
+
+  return { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, levelName: level != null ? LEVELS[level] : null, ageIdx, strIdx,
+    lifts, recovery, vol, split, days, phase, ratePct, rateKg, target, macros, RATIOS, flags, habits: habits.slice(0, 4), fromKg, imp };
+}
+
+/* ---------- Coach report ---------- */
+function setView(v) {
+  $("#tab-form").setAttribute("aria-selected", v === "form"); $("#tab-report").setAttribute("aria-selected", v === "report");
+  $("#view-form").hidden = v !== "form"; $("#view-report").hidden = v !== "report";
+  if (v === "report") renderReport();
+  try { history.replaceState(null, "", v === "report" ? "#report" : "#form"); } catch (e) {}
+  window.scrollTo({ top: 0 });
+}
+function fmt(n, d = 0) { return n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d }); }
+function renderReport() {
+  const el = $("#view-report");
+  const answered = Object.keys(data).filter(k => k !== "units" && filled(data[k])).length;
+  if (answered < 3) {
+    el.innerHTML = `<div class="panel empty" style="margin-top:20px"><h2>No answers yet</h2><p>The report fills in as the client completes the form. Load the example client to see a finished one.</p>
+      <div class="nav-btns" style="justify-content:center"><button class="btn primary" type="button" id="repExample">Load an example client</button></div></div>`;
+    $("#repExample").onclick = () => { data = JSON.parse(JSON.stringify(EXAMPLE)); isExample = true; save(); render(); renderReport(); };
+    return;
+  }
+  const c = calc(data), u = wu(data);
+  const lvlTxt = c.levelName ? c.levelName : "Not enough info";
+  const rec = c.recovery;
+  const recColor = rec == null ? "var(--muted)" : rec < 50 ? "var(--crit)" : rec < 70 ? "var(--warn)" : "var(--ok)";
+  const rir = c.level === 0 ? "Week 1 at 3 reps in reserve, ease to 2 by the last week. Technique and consistency first." : "Week 1 at 3 reps in reserve, down to 0–1 by the last hard week, then deload.";
+  const setsNow = data.sets_now && !["No idea"].includes(data.sets_now) ? data.sets_now : null;
+  const setsNote = c.vol && setsNow && ["15–20", "20+"].includes(setsNow) && c.vol <= 12 ? `Currently doing ${setsNow} sets. Drop to the start point and only add sets when performance stalls.` : setsNow ? `Currently doing ${setsNow} hard sets per muscle each week.` : "";
+  const goalLine = [data.goal_primary, ...(data.goal_secondary || []).filter(x => x !== data.goal_primary)].filter(Boolean).join(" · ");
+  const rateTxt = c.rateKg ? `${c.rateKg > 0 ? "+" : ""}${fmt(c.fromKg(c.rateKg), 2)} ${u}/week (${c.ratePct > 0 ? "+" : ""}${c.ratePct}% of body weight)` : "Hold weight steady";
+
+  el.innerHTML = `<div class="report" style="padding-top:24px">
+    ${isExample ? '<div class="example-banner">Example client. Replace with a real client\'s answers before using these numbers.</div>' : ""}
+    <div class="rep-head">
+      <div><div class="eyebrow">Coach report · ${new Date().toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>
+        <h2 style="font-size:36px">${esc(data.name || "Unnamed client")}</h2>
+        <div style="color:var(--muted)">${[data.age && data.age + " yrs", data.sex, data.wt && data.wt + " " + u, c.bmi && "BMI " + fmt(c.bmi, 1), data.occupation].filter(Boolean).map(esc).join(" · ")}</div>
+        <div style="margin-top:4px">${esc(goalLine)}</div></div>
+      <div class="utility no-print">
+        <button class="btn primary" type="button" id="copyRep">Copy report</button>
+        <button class="btn" type="button" id="dlRep">Download .txt</button>
+        <button class="btn" type="button" id="printRep" hidden>Print / PDF</button>
+      </div>
+    </div>
+
+    <div class="card"><h3>Flags</h3><div class="flags">${c.flags.map(([s, t]) => `<div class="flag ${s}"><span class="pill">${s === "crit" ? "Act" : s === "warn" ? "Watch" : "Clear"}</span><span>${esc(t)}</span></div>`).join("")}</div></div>
+
+    <div class="rep-grid">
+      <div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Training start</h3>
+        <div class="big">${lvlTxt}${c.ageIdx != null && c.strIdx != null && c.ageIdx !== c.strIdx ? `<small>experience ${["beginner", "intermediate", "advanced"][c.ageIdx]}, strength ${["beginner", "intermediate", "advanced"][c.strIdx]}</small>` : ""}</div>
+        <dl class="kv">
+          <dt>Split</dt><dd>${esc(c.split || "–")}</dd>
+          <dt>Session length</dt><dd>${esc(data.session_len || "–")}</dd>
+          <dt>Start volume</dt><dd>${c.vol ? `${c.vol}–${c.vol + 2} sets / muscle / wk` : "–"}</dd>
+          <dt>Progression</dt><dd>+1–2 sets / wk if recovered</dd>
+          <dt>Block length</dt><dd>${c.level === 0 ? "6–8 wk" : "4–6 wk + deload"}</dd>
+          <dt>Equipment</dt><dd>${esc(data.equipment || "–")}</dd>
+        </dl>
+        <ul class="plain"><li>${rir}</li>${setsNote ? `<li>${esc(setsNote)}</li>` : ""}<li>Hit each muscle 2× a week. Start every muscle near the low end and add sets only where it recovers by the next session (low soreness, performance up).</li>
+        ${(data.lagging || []).length ? `<li>Priority muscles: ${esc(data.lagging.join(", "))}. Train first in the session, extra 2–4 sets.</li>` : ""}</ul>
+      </div>
+
+      <div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Energy & macros</h3>
+        <div class="big">${c.target ? fmt(r50(c.target)) : "–"}<small>kcal / day · ${esc(c.phase)}</small></div>
+        <dl class="kv">
+          <dt>From intake + trend</dt><dd>${c.tdeeObs ? fmt(r50(c.tdeeObs)) + " kcal" : "not tracked"}</dd>
+          <dt>From equation</dt><dd>${c.tdeeEst ? fmt(r50(c.tdeeEst)) + " kcal" : "–"}</dd>
+          <dt>Using</dt><dd>${c.tdee ? (c.blend === 1 ? "intake + trend" : c.blend ? "60/40 blend" : "equation × " + c.mult.toFixed(2)) : "–"}</dd>
+          <dt>Target rate</dt><dd>${esc(rateTxt)}</dd>
+          <dt>Protein</dt><dd>${c.macros ? `${c.macros.p} g <span style="color:var(--muted)">(${c.macros.pLo}–${c.macros.pHi})</span>` : "–"}</dd>
+          <dt>Fat</dt><dd>${c.macros ? c.macros.f + " g" : "–"}</dd>
+          <dt>Carbs</dt><dd>${c.macros ? c.macros.c + " g" : "–"}</dd>
+          <dt>BMR</dt><dd>${c.bmr ? fmt(r50(c.bmr)) + " kcal" : "–"}</dd>
+        </dl>
+        <ul class="plain"><li>Starting estimate only. Weigh daily, compare the weekly averages, and adjust calories every 1–2 weeks by the gap between expected and actual rate (≈ 7,700 kcal per kg).</li>
+          ${data.diet_style && data.diet_style !== "No particular diet" ? `<li>Eating style: ${esc(data.diet_style)}${data.allergies ? "; allergies: " + esc(data.allergies) : ""}.</li>` : data.allergies ? `<li>Allergies: ${esc(data.allergies)}.</li>` : ""}</ul>
+      </div>
+
+      <div class="card"><h3><span class="dot" style="background:var(--p-yellow)"></span>Recovery capacity</h3>
+        <div class="big">${rec == null ? "–" : rec}<small>/ 100</small></div>
+        <div class="meter"><i style="width:${rec || 0}%;background:${recColor}"></i></div>
+        <dl class="kv">
+          <dt>Sleep</dt><dd>${esc(data.sleep_hrs || "–")} · quality ${esc(data.sleep_q || "–")}/10</dd>
+          <dt>Stress</dt><dd>${esc(data.stress || "–")}/10</dd>
+          <dt>Energy · mood</dt><dd>${esc(data.energy || "–")}/10 · ${esc(data.mood || "–")}/10</dd>
+          <dt>Soreness lasts</dt><dd>${esc(data.soreness || "–")}</dd>
+          <dt>Digestion</dt><dd>${esc((data.digestion || []).join(", ") || "–")}</dd>
+          <dt>Schedule</dt><dd>${esc(data.schedule || "–")}</dd>
+        </dl>
+        <ul class="plain"><li>${rec == null ? "Needs the sleep, stress and energy answers." : rec < 50 ? "Low. Start below normal volume, keep the deficit small, and fix sleep and stress before pushing training." : rec < 70 ? "Moderate. Standard start; watch sleep and soreness week to week." : "Good. Can start at the upper end and progress normally."}</li></ul>
+      </div>
+
+      <div class="card"><h3><span class="dot" style="background:var(--p-green)"></span>Strength & balance</h3>
+        <div class="ratio">${LIFTS.filter(([k]) => c.lifts[k]).map(([k, n]) => `<span>${n.replace(" (added weight)", "")}</span><span>${fmt(c.lifts[k])} ${u}</span><span class="tag muted">${data.wt ? fmt(c.lifts[k] / num(data.wt), 2) + "× BW" : ""}</span>`).join("") || '<span style="color:var(--muted)">No lifts entered.</span><span></span><span></span>'}</div>
+        ${c.RATIOS.length ? `<div class="eyebrow" style="margin-top:4px">Reference ratios</div><div class="ratio">${c.RATIOS.map(([n, v, lo, hi]) => `<span>${n}</span><span>${fmt(v, 2)}</span><span class="tag ${v < lo ? "warn" : "ok"}">${v < lo ? "low · target " + lo + "–" + hi : "on target"}</span>`).join("")}</div>` : ""}
+        <ul class="plain"><li>Ratios below target point to a weak link to prioritise (often upper back, overhead strength or quads) before chasing the bigger lifts.</li>${data.pullups ? `<li>Strict pull-ups: ${esc(data.pullups)}.</li>` : ""}</ul>
+      </div>
+
+      <div class="card"><h3><span class="dot" style="background:var(--p-white)"></span>First habits</h3>
+        ${c.habits.length ? `<ul class="plain">${c.habits.map(h => `<li>${esc(h)}</li>`).join("")}</ul>` : '<p style="color:var(--muted);margin:0">Nothing urgent. Build on what the client already does.</p>'}
+        <dl class="kv">
+          <dt>Already consistent</dt><dd>${esc((data.habits_now || []).join(", ") || "–")}</dd>
+          <dt>Barriers</dt><dd>${esc((data.barriers || []).join(", ") || "–")}</dd>
+          <dt>Longest streak</dt><dd>${esc(data.streak || "–")}</dd>
+          <dt>Readiness</dt><dd>${esc(data.commit || "–")}/10</dd>
+          <dt>Check-ins</dt><dd>${esc(data.checkin || "–")}</dd>
+          <dt>Coaching style</dt><dd>${esc(data.coach_style || "–")}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card"><h3>All answers</h3><div class="answers">${answersHTML()}</div></div>
+    <p class="note">Estimates use standard formulas (Mifflin-St Jeor, Epley 1RM) and general coaching guidelines. They're a starting point to adjust from real progress, not medical or dietetic advice.</p>
+  </div>`;
+  $("#copyRep").onclick = () => copyText(reportText(), "Report copied");
+  $("#dlRep").onclick = () => downloadText(reportText(), `${(data.name || "client").replace(/\W+/g, "-").toLowerCase()}-assessment.txt`);
+  if (canPrint()) { $("#printRep").hidden = false; $("#printRep").onclick = () => window.print(); }
+}
+
+function answerRows() {
+  const u = wu(data);
+  return SECTIONS.map(s => {
+    const rows = [];
+    flat(s.fields).forEach(f => {
+      if (f.show && !f.show(data)) return;
+      if (f.type === "injuries") {
+        REGIONS.forEach(([k, n]) => { const st = data["inj_" + k]; if (st && st !== "None") rows.push([n, [st, data["inj_" + k + "_side"], data["inj_" + k + "_pain"] != null && data["inj_" + k + "_pain"] !== "" ? `pain ${data["inj_" + k + "_pain"]}/10` : "", data["inj_" + k + "_note"]].filter(Boolean).join(" · ")]); });
+        return;
+      }
+      if (f.type === "lifts") {
+        LIFTS.forEach(([k, n]) => { const w = data["lift_" + k + "_w"], r = data["lift_" + k + "_r"]; if (filled(w) || filled(r)) rows.push([n, `${w || "?"} ${u} × ${r || "?"}`]); });
+        if (filled(data.pullups)) rows.push(["Max strict pull-ups", data.pullups]);
+        return;
+      }
+      if (f.id === "ht_in") return;
+      if (f.id === "ht_ft") { if (filled(data.ht_ft)) rows.push(["Height", `${data.ht_ft} ft ${data.ht_in || 0} in`]); return; }
+      const v = data[f.id]; if (!filled(v)) return;
+      const unit = typeof f.unit === "function" ? f.unit(data) : f.unit;
+      rows.push([f.label.trim() || "Height", Array.isArray(v) ? v.join(", ") : v + (unit && f.type === "number" ? " " + unit : "")]);
+    });
+    return [s.title, rows];
+  });
+}
+function answersHTML() {
+  return answerRows().map(([t, rows]) => `<div><h3>${esc(t)}</h3>${rows.length ? `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : '<p style="color:var(--muted);margin:8px 0 0;font-size:14px">No answers.</p>'}</div>`).join("");
+}
+function reportText() {
+  const c = calc(data), u = wu(data), L = [];
+  L.push(`STARTING POINT ASSESSMENT — ${data.name || "Unnamed client"}`, new Date().toDateString(), "");
+  if (isExample) L.push("(EXAMPLE CLIENT)", "");
+  L.push("FLAGS"); c.flags.forEach(([s, t]) => L.push(`- [${s === "crit" ? "ACT" : s === "warn" ? "WATCH" : "CLEAR"}] ${t}`));
+  L.push("", "TRAINING START",
+    `- Level: ${c.levelName || "–"}`, `- Split: ${c.split || "–"}`, `- Start volume: ${c.vol ? `${c.vol}–${c.vol + 2} hard sets per muscle per week, +1–2 sets/week if recovered` : "–"}`,
+    `- Effort: ${c.level === 0 ? "3 RIR easing to 2 RIR" : "3 RIR down to 0–1 RIR, then deload"}`);
+  L.push("", "ENERGY & MACROS",
+    `- Target: ${c.target ? fmt(r50(c.target)) + " kcal/day" : "–"} (${c.phase})`,
+    `- Expenditure: ${c.tdee ? fmt(r50(c.tdee)) + " kcal" : "–"} (${c.blend === 1 ? "from intake + weight trend" : c.blend ? "blend of intake + trend and equation" : "equation estimate"})`,
+    `- Rate: ${c.rateKg ? fmt(c.fromKg(c.rateKg), 2) + " " + u + "/week" : "maintain"}`,
+    `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
+  L.push("", `RECOVERY: ${c.recovery ?? "–"}/100`);
+  if (c.RATIOS.length) { L.push("", "STRENGTH RATIOS"); c.RATIOS.forEach(([n, v, lo, hi]) => L.push(`- ${n}: ${v.toFixed(2)} (target ${lo}–${hi})`)); }
+  if (c.habits.length) { L.push("", "FIRST HABITS"); c.habits.forEach(h => L.push("- " + h)); }
+  L.push("", "=".repeat(40), "ALL ANSWERS");
+  answerRows().forEach(([t, rows]) => { L.push("", t.toUpperCase()); rows.forEach(([k, v]) => L.push(`${k}: ${v}`)); });
+  return L.join("\n");
+}
+
+/* ---------- Review step ---------- */
+function reviewHTML() {
+  const missing = SECTIONS.map((s, i) => [s, i]).filter(([s, i]) => !complete(i) && s.req.length);
+  const to = COACH.email ? `<p>Send them to <b class="mono" style="user-select:all">${esc(COACH.email)}</b>${COACH.name ? " (" + esc(COACH.name) + ")" : ""}.</p>` : "<p>Send them to your coach by email or message.</p>";
+  return `<div class="sec-head"><div class="plate" style="background:var(--sunk)">✓</div><div><div class="eyebrow">Last step</div><h2>Review & send</h2>
+      <p>Check your answers below, then copy or download them and send them to your coach.</p></div></div>
+    ${missing.length ? `<div class="flag warn" style="margin:12px 0"><span class="pill">Missing</span><span>Some required answers are still blank in: ${missing.map(([s, i]) => `<a href="#" data-step="${i}">${esc(s.title)}</a>`).join(", ")}.</span></div>` : `<div class="flag ok" style="margin:12px 0"><span class="pill">Done</span><span>All required answers are in. The bar is fully loaded.</span></div>`}
+    ${to}
+    <div class="utility" style="margin:4px 0 16px"><button class="btn primary" type="button" id="copyAns">Copy my answers</button><button class="btn" type="button" id="dlAns">Download .txt</button>${COACH.email ? '<a class="btn" id="mailAns" href="#">Open in email</a>' : ""}</div>
+    <div class="answers">${answersHTML()}</div>
+    <div class="nav-btns"><button type="button" class="btn" data-go="-1">Back</button></div>`;
+}
+function bindReview() {
+  $("#copyAns").onclick = () => copyText(reportText(), "Answers copied. Paste them into an email or message to your coach.");
+  $("#dlAns").onclick = () => downloadText(reportText(), `${(data.name || "my").replace(/\W+/g, "-").toLowerCase()}-assessment.txt`);
+  const m = $("#mailAns");
+  if (m) m.href = `mailto:${COACH.email}?subject=${encodeURIComponent("Starting Point Assessment — " + (data.name || ""))}&body=${encodeURIComponent(reportText().slice(0, 1800) + "\n\n(Full answers attached or pasted below.)")}`;
+}
+
+/* ---------- Copy / download helpers (work standalone and inside a Claude artifact) ---------- */
+function canPrint() { try { return window.self === window.top && !window.claude; } catch (e) { return false; } }
+async function copyText(txt, msg) {
+  try { await navigator.clipboard.writeText(txt); toast(msg); }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = txt; ta.style.cssText = "position:fixed;top:0;left:0;width:100%;height:50%;z-index:9";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (_) {}
+    if (ok) { ta.remove(); toast(msg); } else { toast("Press Ctrl/Cmd+C to copy, then click anywhere"); ta.addEventListener("blur", () => ta.remove()); }
+  }
+}
+async function downloadText(txt, filename) {
+  if (window.claude && typeof window.claude.use === "function") {
+    try { const dl = await window.claude.use("downloads"); if (dl) { await dl.save({ filename, data: txt }); return; } } catch (e) { toast("Download cancelled. Use Copy instead."); return; }
+  }
+  try {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = filename;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  } catch (e) { toast("Download isn't available here. Use Copy instead."); }
+}
+
+/* ---------- Example client (clearly labelled in the UI) ---------- */
+const EXAMPLE = {
+  units: IMPERIAL, name: "Jordan Reyes (example)", email: "jordan@example.com", phone: "", age: "34", sex: "Male", ht_ft: "5", ht_in: "10", wt: "192",
+  occupation: "Project manager", job_activity: "Mostly sitting", steps: "4,000–7,000",
+  goal_primary: "Lose body fat", goal_secondary: ["Build muscle", "Get stronger"], goal_specific: "Down to about 178 lb, see abs again, bench 225 for a single.",
+  goal_why: "Wedding in June and I've drifted the last two years since my second kid.", goal_wt: "178", deadline: "June 14", commit: "8", days: "4", session_len: "60–75 min",
+  equipment: "Full commercial gym", style_pref: ["Barbell strength", "Bodybuilding"], dislikes: "Burpees, long steady cardio.",
+  parq_heart: "No", parq_chest: "No", parq_dizzy: "No", parq_chronic: "No", parq_meds: "No", parq_bone: "No", parq_super: "No",
+  conditions: ["None"], supps: "Creatine 5 g, whey, vitamin D", bloodwork: "1–3 years ago", smoke: "Never",
+  inj_shoulder: "Past", inj_shoulder_side: "Right", inj_shoulder_note: "Rotator cuff strain 2021, fine now. Wide-grip bench bothers it.",
+  inj_lowback: "Current", inj_lowback_side: "Centre", inj_lowback_pain: "3", inj_lowback_note: "Tight after long days sitting and after heavy deadlifts.",
+  pain_moves: ["Hinging / deadlifts", "Long periods of sitting"], physio: "No", mobility: ["Squat to parallel with heels down", "Balance on one leg for 30 s each side"],
+  train_age: "2–5 years", train_now: "3–4 days/week", current_routine: "3 days full body when I can: squat or deadlift, bench, rows, curls. Usually 45 min.",
+  sets_now: "6–10", rir: "2–3 reps left", logs: "Sometimes",
+  lift_squat_w: "245", lift_squat_r: "5", lift_bench_w: "185", lift_bench_r: "5", lift_dead_w: "295", lift_dead_r: "3", lift_ohp_w: "105", lift_ohp_r: "5", lift_chin_w: "0", lift_chin_r: "6", pullups: "6",
+  cardio: "1–2 times", cardio_type: "Pickup basketball on Sundays", sports: "High school basketball and track.",
+  prev_best: "Age 29, 4-day upper/lower and tracking macros. Around 175 lb.", prev_worked: "Upper/lower split, tracking food on weekdays.",
+  prev_failed: "Running programs; stopped when my knees ached. Lost the routine when the second baby came.",
+  grows: ["Quads", "Arms"], lagging: ["Chest", "Back", "Shoulders"], soreness: "1–2 days", joint_ache: "Sometimes",
+  tracks_food: "Track daily in an app", cal_avg: "2650", protein_avg: "120", track_conf: "Mostly estimates", wt_trend: "Gone up", wt_change: "3",
+  typical_day: "Coffee only until 11. Lunch out (burrito bowl). Snacks at 3pm. Big dinner with family, then snacks after the kids are in bed. Beers on Fri/Sat.",
+  meals: "3", pattern: ["Skip breakfast", "Eat late at night", "Overeat on weekends"], diet_style: "No particular diet", water: "1–2 L", alcohol: "4–7", caffeine: "3–4 cups",
+  diet_count: "1–2", last_diet: "Over a year ago", wt_low: "172", wt_high: "195", food_rel: ["Eating when stressed"], cook: "Basic", prep_time: "1–3 h",
+  sleep_hrs: "6–7 h", sleep_q: "5", bed_wake: "Midnight to 6:30", wake_night: "Once", screens: "Yes", stress: "7", stress_src: ["Work", "Family"], energy: "5",
+  energy_dip: ["Late afternoon"], mood: "6", digestion: ["Regular daily bowel movements", "Bloating"], cravings: ["Sugar"], cold: "No", schedule: "Regular days",
+  habits_now: ["Training 3+ times a week", "Vegetables daily"], habits_past: "Meal prepping Sundays worked when I had a set lunch time.", habits_lost: "Meal prep, tracking, morning walks.",
+  barriers: ["Time", "Family commitments", "Night eating"], streak: "1+ year", support: "Very supportive", checkin: "Weekly check-in", coach_style: "Explain the why",
+  will_track: ["Daily morning weight", "Food (calories / macros)", "Training log", "Progress photos"],
+  consent: ["My answers are accurate, and I'll tell my coach about any change in my health. I understand this isn't medical advice."]
+};
+
+/* ---------- Boot ---------- */
+if (COACH.name) $("#coachLine").textContent = `New client intake · ${COACH.name}`;
+render();
+if (location.hash === "#report") setView("report");
+</script>
+</body>
+</html>

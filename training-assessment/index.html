@@ -1161,9 +1161,10 @@ function recoveryProtocol(d, c) {
 function slowPlan(d, c) {
   const R = COACH_RULES, [ga, gb, gc] = R.gbc, L = Math.max(R.firstMonthsDays, c.laterDays || 2);
   const jump = c.older ? "+1–2%" : "+2–3%";
-  const found = (n, stage, reps) => ({ name: `Foundation ${n}`, train: `${R.firstMonthsDays}×/wk full body · one limb at a time · A 3–4 × ${reps} constant load · B 3 × 12 · C building blocks stage ${stage} · 4-0-1-0` });
-  const basics = n => ({ name: "Basic lifts + KILO split", train: `${c.afterSplit} · basic lifts introduced (goblet / heels-elevated squat, trap-bar deadlift, DB presses, rows, chin-ups) · A 4 × 10 → 4 × 8 · B 3 × 10–12 · C building blocks stage 3 · ${jump} when all reps are clean` });
-  const gbc = (n, aSets, cSets) => ({ name: `GBC ${ga}-${gb}-${gc} · ${n}`, train: `${c.afterSplit} · A ${aSets} × ${ga} (step loading, strength focus) · B 3 × ${gb} · C ${cSets} × ${gc} · short rests on B/C, full rest on A · ${jump} on A when all reps are clean` });
+  const VOL = ["sets build 3 → 4 → 4 → 5 (ascending)", "sets 4 → 5 → 5 → 3 (step: last week lighter)", "sets 4 every week (constant)"];
+  const found = (n, stage, reps) => ({ name: `Foundation ${n}`, train: `${R.firstMonthsDays}×/wk full body · one limb at a time · A ${reps} reps, constant load, ${VOL[(n - 1) % 3]} · B 3 × 12 · C building blocks stage ${stage} · 4-0-1-0 · B/C last set close to failure` });
+  const basics = n => ({ name: "Basic lifts + KILO split", train: `${c.afterSplit} · basic lifts introduced (goblet / heels-elevated squat, trap-bar deadlift, DB presses, rows, chin-ups) · A 4 × 10 → 4 × 8, constant load · B 3 × 10–12 · C building blocks stage 3 · ${jump} once every set hits the top of the range` });
+  const gbc = (n, aSets, cSets) => ({ name: `GBC ${ga}-${gb}-${gc} · ${n}`, train: `${c.afterSplit} · A ${aSets} × ${ga} (${c.tier >= 1 ? "step loading, ~10% spread to a 6RM last set" : "constant load"}, strength focus) · B 3 × ${gb} · C ${cSets} × ${gc} · short rests on B/C, full rest on A · ${jump} on A when every set hits ${ga}` });
   const plan = c.older
     ? [found(1, 1, "12–15"), found(2, 2, "10–12"), found(3, 3, "10–12")]
     : c.tier === 2
@@ -1307,8 +1308,10 @@ function calc(d) {
   const afterSplit = laterDays >= 4 ? "Upper / Lower × 2 (KILO split)" : laterDays === 3 ? "Upper / Lower / Full body" : "Full body × 2 with basic lifts";
   const split = slow
     ? `Full body × ${COACH_RULES.firstMonthsDays} for weeks 1–${foundWeeks}, then ${afterSplit}`
-    : days ? SPLITS[days] : null;
+    : days ? (/Lose body fat|Recomp/.test(d.goal_primary || "") ? `Full body × ${Math.min(days, 4)} (KILO fat-loss split: metabolic stress first)` : SPLITS[days]) : null;
   if (slow && days && days > COACH_RULES.firstMonthsDays) taNotes.push(`Client has ${days} days available; keep it to ${COACH_RULES.firstMonthsDays} full-body sessions a week for the first ${foundWeeks} weeks. Extra days can be walks or mobility.`);
+  taNotes.push(tier == null || tier === 0 ? "Tracking: general trends only (did the reps, did the load go up). Beginners don't need complex systems; they need practice." : tier < 3 ? "Tracking: start logging estimated 1RM and tonnage (sets × reps × load) on the A lifts." : "Tracking: e1RM, tonnage, average intensity and lift-goal % (current e1RM ÷ target) every mesocycle.");
+  if (num(d.pullups) === 0 || (d.map_chin && /Eccentric|Band/.test(d.map_chin))) taNotes.push("No strict chin-up yet: run KILO's chin-up progression (3 phases of about 6 weeks, twice a week; leave phase 1 after 15 total eccentric reps across the sets). First strict rep usually around week 13.");
   if (older) taNotes.push(`Age ${age}: clients over ${COACH_RULES.ageSlow} take longer to get back to normal. Foundation runs ${foundWeeks} weeks, load jumps stay at 1–2%, warm-ups are longer, and recovery days are protected.`);
 
   // Energy target by goal
@@ -1791,9 +1794,26 @@ const TEMPLATES = [
   { group: "Poliquin", name: "Accumulation / intensification", who: "All levels", weeks: [["Principle", "Alternate volume phases and intensity phases every 2–3 weeks so neither quality detrains"], ["KILO", "Formalised as 3-week mesocycles inside a 12-week macrocycle"]] }
 ];
 
+// KILO's published principles (trainkilo.com "Inside the System" blog and Between 2 Racks podcast)
+const KILO_PRINCIPLES = [
+  ["Training age", "Year 1 is the \"sponge\" phase", "Early strength is mostly neural: better recruitment, rate coding and coordination. Beginners need practice and simple systems; advanced methods on beginners (or too little stress on advanced lifters) both stall progress."],
+  ["Beginner loading", "Constant load on the A series", "Beginners don't yet know their true strength or how they tire across sets. Use one submaximal load for every set; raise it once every set hits the top of the rep range cleanly."],
+  ["Step loading", "Intermediates and up: ~10–12% spread, finishing at the RM", "Build set to set to the rep-max load on the last set. All reps done: +2–3% next session. Without microplates, start next week at last week's set-2 load."],
+  ["Session structure", "A primary · B assistance · C remedial", "A: the PRIMEIGHT lifts (squat, front squat, deadlift, overhead press, incline press, bench press, dip, chin-up), tempo 4-0-X-0 (4-1-X-0 for deadlifts), lower-body A done alone with 180–240 s rest. B: 6–12 reps, 3-0-1-0, 60–90 s (150–180 s for big lifts). C: isolation and prehab in pairs. B and C use constant load taken close to failure."],
+  ["Periodization", "12-week phase-undulating macrocycle", "Four 3-week mesocycles alternating accumulation (volume) and intensification (load). The point is shifting the dominant stressor, not just changing reps."],
+  ["Mesocycle loading", "Volume shape across each 3-week block", "Ascending (3 → 4 → 5 sets), step (4 → 5 → 3), constant (4 each week) or descending. A sample macro runs ascending, step, constant, descending."],
+  ["Mesocycle length", "4 weeks for novices, 2 for advanced when time is short", "Novices need more exposure to each stimulus; advanced lifters adapt fast. A 2-week \"super accumulation\" overload block is an advanced tool."],
+  ["Splits", "Match the split to the goal", "Fat loss: full body (metabolic stress first; KILO's fat-loss programs run 4 full-body days, about 12 weeks). Hypertrophy: alternate body-part and upper/lower phases. Strength: upper/lower around the primary lifts."],
+  ["Metrics", "Track what fits the training age", "Novices: general trends. Intermediates: e1RM and tonnage (sets × reps × load). Advanced: average intensity (70–80% in accumulation, 80–90%+ in intensification) and lift-goal % (e1RM ÷ target)."],
+  ["Strength ratios", "A guide, not a rule", "Squat vs deadlift, squat vs front squat, bench vs chin-up, bench vs overhead press. A lagging ratio points to the weak link to prioritise."],
+  ["Chin-up progression", "3 phases of ~6 weeks, twice a week", "For clients without a strict chin-up. Leave phase 1 after 15 total eccentric reps across the sets; most get their first strict rep around week 13."],
+  ["Deloads and effort", "Plan deloads proactively; teach effort", "Plan deloads into the macrocycle rather than waiting for breakdown. Effort is a skill: rest-pause, extended sets and metabolic finishers once technique is solid."],
+  ["MAP", "Movement first, then the lift", "If a client can't squat to depth or press overhead without compensating, use the regression (goblet squat, landmine press) instead of forcing the primary lift."]
+];
+
 const COACH_NOTES = [
   ["Charles Poliquin", "Structural balance before chasing big lifts; tempo on every exercise; alternate accumulation and intensification; GVT, GBC and 6-12-25 as hypertrophy and fat-loss tools.", "Structural balance test, tempo in every series, GBC 6-12-25 in block 2."],
-  ["KILO (Cazeault and team)", "A/B/C series, 3-week mesocycles, goal-specific rep schemes and intensities, standard sets for most of a beginner's year. Cazeault: less training stress can help fat loss.", "Session structure, rep-scheme database, step loading, no extra volume for fat loss."],
+  ["KILO (Cazeault and team)", "A/B/C series, 3-week mesocycles, goal-specific rep schemes and intensities, standard sets for most of a beginner's year. Beginners get constant loading and 4-week mesocycles. Cazeault: less training stress can help fat loss.", "Session structure, rep-scheme database, constant loading for beginners, step loading later, no extra volume for fat loss."],
   ["Mike Boyle", "Single-leg training leads and bilateral supports. Progress from static supported (split squat) to dynamic (lunges, step-ups) to unsupported (1-leg RDL).", "One-limb foundation and the building-block knee and hamstring sequences."],
   ["Dan John", "Five movements: push, pull, hinge, squat, loaded carry. Goblet squat as the squat entry point. Everyday fitness = strength training, walking and caloric correctness.", "Goblet squat as the first basic lift, carries in the trunk blocks, steps before cardio."],
   ["Ian King", "Single-leg work and control drills; stability before load.", "Unilateral A series in the foundation phase."],
@@ -1840,6 +1860,8 @@ function renderLibrary() {
       </div>
       <div class="tbl-wrap"><table class="road"><thead><tr><th>% 1RM</th><th>A series</th><th>Volume</th><th>Quality</th><th>Type</th><th>Phase</th><th>Level</th></tr></thead><tbody id="schemeRows"></tbody></table></div>
       <div id="typeNotes" class="proto" style="display:grid"></div></div>
+
+    <div class="card"><h3>KILO principles</h3><p style="margin:0;color:var(--muted);font-size:14px">From KILO's Inside the System blog and Between 2 Racks podcast. These drive the defaults in the coach report.</p><dl class="proto">${KILO_PRINCIPLES.map(([n, a, b]) => `<dt>${esc(n)}</dt><dd><b>${esc(a)}</b><span>${esc(b)}</span></dd>`).join("")}</dl></div>
 
     <div class="card"><h3>What other coaches add for gen-pop clients</h3><dl class="proto">${COACH_NOTES.map(([n, a, b]) => `<dt>${esc(n)}</dt><dd><b>${esc(a)}</b><span>Used here: ${esc(b)}</span></dd>`).join("")}</dl></div>
   </div>`;

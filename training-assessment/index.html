@@ -173,6 +173,7 @@ ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column;
 .proto { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 12px 18px; margin: 0; font-size: 14px; }
 .proto dt { font: 500 11px/1.6 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-top: 2px; }
 .proto dd { margin: 0; }
+.proto.tight { grid-template-columns: minmax(56px, 84px) minmax(0, 1fr); gap: 8px 12px; }
 .proto dd b { display: block; font-weight: 600; }
 .proto dd span { color: var(--muted); }
 @media (max-width: 560px) { .proto { grid-template-columns: minmax(0, 1fr); gap: 2px; } .proto dd { margin-bottom: 10px; } }
@@ -217,6 +218,7 @@ table.road td:first-child { font-weight: 600; white-space: nowrap; }
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-form" aria-selected="true" data-view="form">Client form</button>
       <button role="tab" id="tab-report" aria-selected="false" data-view="report">Coach report</button>
+      <button role="tab" id="tab-library" aria-selected="false" data-view="library">Program library</button>
     </div>
   </header>
 
@@ -239,6 +241,7 @@ table.road td:first-child { font-weight: 600; white-space: nowrap; }
   </section>
 
   <section id="view-report" hidden></section>
+  <section id="view-library" hidden></section>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -253,9 +256,13 @@ const PROGRAM_PLAN = { blockWeeks: 12, deloadWeeks: 1, blocks: 2, reassessEvery:
 const COACH_RULES = {
   advancedTier: 3,            // tier at which the normal (heavier, more frequent) programming starts
   repRange: "6–15",           // no heavy loading (under 6 reps) for at least the first year
-  firstMonthsDays: 2,         // sessions per week for the first 3 months
-  firstMonths: 3,
-  laterMaxDays: 3,            // cap after month 3 for non-advanced clients
+  firstMonthsDays: 2,         // full-body sessions per week during the foundation phase
+  foundationWeeks: 8,         // beginners: 2 full-body days for at least 8 weeks, then basic lifts + KILO splits
+  foundationWeeks50: 12,      // clients 50+: foundation runs the whole first block
+  ageSlow: 50,                // 50+ take longer to get back to normal: smaller jumps, longer foundation
+  minCommitMonths: 6,         // no programs under 6 months
+  gbc: [6, 12, 25],           // block 2: GBC with A series sets of 6, B series 12, C series 25
+  laterMaxDays: 4,            // cap after the foundation phase
   phaseWeeks: 4,              // each phase / exercise selection runs 4 weeks
   unilateralTiers: [0, 1],    // these tiers train one limb at a time for the whole 6 months
   unilateralBlock1Tiers: [2]  // these tiers stay unilateral in block 1, then may add bilateral lifts (still 6–15 reps)
@@ -280,7 +287,7 @@ const BUILDING_BLOCKS = [
    deload, then a second 12-week macrocycle. Rep schemes are for the A series (% of 1RM). */
 const KILO = {
   series: {
-    slow: [["A · primary", "4 sets · 6–12 reps · 4-0-X-0 · rest 90–120 s"], ["B · assistance", "3 sets · 8–12 reps · 3-0-1-0 · rest 60–90 s"], ["C · remedial", "2–3 sets · 10–15 reps · 3-0-1-0 · rest 30–60 s · building blocks"]],
+    slow: [["A · primary", "Block 1: 3–4 × 8–15, one limb at a time · Block 2 (GBC): sets of 6 · 4-0-X-0 · full rest · the strength lift, tracked every session"], ["B · assistance", "Block 1: 3 × 10–12 · Block 2 (GBC): sets of 12 · 3-0-1-0 · rest 60–90 s"], ["C · remedial", "Block 1: building blocks 2–3 × 12–15 · Block 2 (GBC): sets of 25 · 2-0-1-0 · rest 30–60 s"]],
     advanced: [["A · primary", "4–6 sets · 1–12 reps · 4-0-X-0 · rest 90–240 s"], ["B · assistance", "3–4 sets · 6–12 reps · 3-0-1-0 · rest 60–90 s"], ["C · remedial", "2–3 sets · 10–15 reps · 3-0-1-0 · rest 30–60 s"]]
   },
   // Goal → [macrocycle 1 quality, macrocycle 2 quality] for Advanced clients
@@ -307,6 +314,7 @@ const KILO = {
     ["Accumulation", 70, "4×12", "Concentric · IMCA"], ["Intensification", 78, "5×8", "Eccentric · concentric-eccentric combo"], ["Accumulation", 72, "5×11", "Concentric · IMCA"],
     ["Intensification", 80, "5×7", "Isometric · eccentric pauses"], ["Accumulation", 74, "4×10", "Concentric · IMCA"], ["Intensification", 81, "5×6", "Isometric · eccentric pauses"]
   ],
+  strengthBias: "Strength bias: the A series is always the session's strength lift. Log it, beat it, and retest its 6RM at every full reassessment.",
   loading: "Step loading: start about 10% under the target RM and build set to set to finish at it. All reps done: start 2–3% heavier next session. Missed reps: repeat the load."
 };
 
@@ -380,7 +388,7 @@ const SECTIONS = [
         { id: "ht_in", label: " ", type: "number", unit: "in", show: isImp },
         { id: "ht_cm", label: "Height", type: "number", unit: "cm", show: d => !isImp(d) },
         { id: "wt", label: "Current body weight", type: "number", unit: wu } ] },
-      { id: "occupation", label: "Occupation", type: "text" },
+      { id: "occupation", label: "What do you do for work?", help: "Job title, hours, and whether it's physical, desk-bound or high-stress.", type: "text" },
       { id: "job_activity", label: "During work hours you are…", type: "chips", options: ["Mostly sitting", "Mixed sitting and standing", "On my feet most of the day", "Heavy physical work"] },
       { id: "steps", label: "Average daily steps", help: "Check your phone or watch for the last 2 weeks if you can.", type: "chips", options: ["Under 4,000", "4,000–7,000", "7,000–10,000", "10,000–13,000", "Over 13,000", "Not sure"] }
     ] },
@@ -390,12 +398,14 @@ const SECTIONS = [
     fields: [
       { id: "goal_primary", label: "Main goal", type: "chips", options: GOALS },
       { id: "goal_secondary", label: "Anything else you'd like from training?", type: "multi", options: GOALS },
-      { id: "goal_specific", label: "What would success look like in 12 weeks?", help: "Be specific: a weight, a lift, a pant size, running a 5K without stopping.", type: "textarea" },
+      { id: "goal_6mo", label: "What does your goal look like 6 months from now?", help: "Be specific: a weight, a lift, a pant size, how you feel, what you can do.", type: "textarea" },
+      { id: "goal_1yr", label: "What does your goal look like 1 year from now?", type: "textarea" },
       { id: "goal_why", label: "Why now?", type: "textarea" },
       { group: [
         { id: "goal_wt", label: "Goal body weight (optional)", type: "number", unit: wu },
         { id: "deadline", label: "Event or date you're working toward", type: "text" } ] },
-      { id: "commit", label: "How ready are you to change your routine right now?", type: "scale", min: 1, max: 10, lo: "Not really", hi: "All in" },
+      { id: "commit", label: "How ready are you to invest in a long-term plan?", type: "scale", min: 1, max: 10, lo: "Not really", hi: "All in" },
+      { id: "commit_len", label: "How long are you ready to commit to coaching?", help: "Real change in body composition and strength takes months, not weeks.", type: "chips", options: ["Under 3 months", "3–6 months", "6–12 months", "1 year or more"] },
       { id: "days", label: "Days per week you can train", type: "chips", options: ["2", "3", "4", "5", "6"] },
       { id: "session_len", label: "Time per session", type: "chips", options: ["30–45 min", "45–60 min", "60–75 min", "75–90 min", "90+ min"] },
       { id: "equipment", label: "Where will you train?", type: "chips", options: ["Full commercial gym", "Home gym with rack & barbell", "Dumbbells / bands only", "Bodyweight only"] },
@@ -414,7 +424,8 @@ const SECTIONS = [
       { id: "parq_bone", label: "Do you have a bone, joint or soft-tissue problem that more activity could make worse?", type: "chips", options: YN },
       { id: "parq_super", label: "Has a doctor ever said you should only do medically supervised physical activity?", type: "chips", options: YN },
       { id: "cleared", label: "Has a doctor cleared you for exercise?", type: "chips", options: ["Yes, in writing", "Yes, verbally", "Not yet"], show: d => PARQ.some(k => d[k] === "Yes") },
-      { id: "conditions", label: "Diagnosed conditions", type: "multi", options: ["Type 1 diabetes", "Type 2 diabetes / prediabetes", "Thyroid condition", "Asthma", "High cholesterol", "PCOS", "Autoimmune condition", "Osteoporosis / osteopenia", "Anxiety / depression", "Digestive condition (IBS, IBD, celiac)", "None"] },
+      { id: "conditions", label: "Diagnosed conditions", type: "multi", options: ["Type 1 diabetes", "Type 2 diabetes / prediabetes", "Thyroid condition", "Asthma", "High cholesterol", "PCOS", "Autoimmune condition", "Osteoporosis / osteopenia", "Anxiety / depression", "Digestive condition (IBS, IBD, celiac)", "High blood pressure", "Kidney disease or reduced kidney function", "Kidney stones", "Fatty liver", "Hepatitis or other liver disease", "Gout", "Sleep apnea", "None"] },
+      { id: "organ_note", label: "Kidney or liver details", help: "Diagnosis, when, who follows you, and any recent results (eGFR, creatinine, liver enzymes) if you know them.", type: "textarea", show: d => (d.conditions || []).some(x => /Kidney|liver|Fatty/i.test(x)) },
       { id: "conditions_note", label: "Details or other conditions", type: "textarea" },
       { id: "meds_list", label: "Do you take any of these?", type: "multi", options: ["Statin (cholesterol)", "Other cholesterol medication", "Blood pressure medication", "Metformin or other diabetes pill", "Insulin", "GLP-1 (Ozempic, Wegovy, Mounjaro, Zepbound)", "Thyroid medication", "Antidepressant or anti-anxiety", "Blood thinner", "Birth control or HRT", "None"] },
       { id: "statin_name", label: "Which statin?", type: "chips", options: ["Atorvastatin (Lipitor)", "Rosuvastatin (Crestor)", "Simvastatin (Zocor)", "Pravastatin", "Lovastatin", "Other / not sure"], show: d => (d.meds_list || []).includes("Statin (cholesterol)") },
@@ -431,7 +442,12 @@ const SECTIONS = [
       { group: [
         { id: "bloodwork", label: "Last blood work", type: "chips", options: ["Within 12 months", "1–3 years ago", "Longer / never"] },
         { id: "bp", label: "Last blood pressure reading, if known", type: "text" } ] },
-      { id: "smoke", label: "Smoking or vaping", type: "chips", options: ["Never", "Former", "Current smoker", "Vape"] }
+      { id: "smoke", label: "Smoking or vaping", type: "chips", options: ["Never", "Former", "Current smoker", "Vape"] },
+      { id: "smoke_note", label: "How much, and for how long? (or when did you quit?)", type: "text", show: d => d.smoke && d.smoke !== "Never" },
+      { id: "drugs", label: "Recreational drug use", help: "Confidential. It only matters for safety, sleep and recovery.", type: "chips", options: ["Never", "Former", "Occasional", "Regular"] },
+      { id: "drug_type", label: "Which ones?", type: "multi", options: ["Cannabis", "Cocaine or other stimulants", "Opioids", "MDMA / ecstasy", "Prescription misuse", "Other"], show: d => d.drugs && d.drugs !== "Never" },
+      { id: "drug_when", label: "When did you stop?", type: "text", show: d => d.drugs === "Former" },
+      { id: "alc_binge", label: "How often do you have 4+ drinks (women) or 5+ drinks (men) in one sitting?", type: "chips", options: ["Never", "Less than monthly", "Monthly", "Weekly or more"] }
     ] },
 
   { id: "injuries", title: "Injuries & pain", intro: "Mark anything that bothers you now or has in the past. Pain is on a 0–10 scale, where 0 is none and 10 is the worst imaginable.",
@@ -461,7 +477,9 @@ const SECTIONS = [
       { id: "lifts", label: "Recent best sets (last 3 months)", help: "Weight and reps for one hard set. For chin-ups, enter the added weight (0 if bodyweight).", type: "lifts" },
       { id: "cardio", label: "Cardio per week", type: "chips", options: ["None", "1–2 times", "3–4 times", "5+ times"] },
       { id: "cardio_type", label: "What kind of cardio, and how long?", type: "text" },
-      { id: "sports", label: "Sports background", type: "textarea" },
+      { id: "sports_now", label: "Do you play any sports now?", type: "chips", options: ["No", "Yes, recreationally", "Yes, competitively"] },
+      { id: "sports_now_what", label: "Which sports, and how often?", type: "text", show: d => d.sports_now && d.sports_now !== "No" },
+      { id: "sports", label: "Sports you played in the past (and level)", type: "textarea" },
       { id: "prev_best", label: "When were you in your best shape? What were you doing then?", type: "textarea" },
       { id: "prev_worked", label: "Programs or approaches that worked well", type: "textarea" },
       { id: "prev_failed", label: "What hasn't worked, and why did you stop?", type: "textarea" },
@@ -482,11 +500,17 @@ const SECTIONS = [
       { id: "wt_trend", label: "Over the last 4 weeks your weight has…", type: "chips", options: ["Gone down", "Stayed about the same", "Gone up", "Not sure"] },
       { id: "wt_change", label: "By about how much?", type: "number", unit: wu, show: d => d.wt_trend === "Gone down" || d.wt_trend === "Gone up" },
       { id: "nut_pref", label: "How would you like to manage your food?", type: "chips", options: ["Track calories & macros", "Hit a protein target only", "Hand portions, no tracking", "Follow a meal plan", "Not sure"] },
-      { id: "typical_day", label: "Walk through a typical day of eating", help: "Times, meals, snacks, drinks. Weekends too if they're different.", type: "textarea" },
+      { id: "meal_bfast", label: "What do you usually eat for breakfast?", help: "Include drinks and the time. Write \"nothing\" if you skip it.", type: "textarea" },
+      { id: "meal_snack1", label: "Morning snack?", type: "text" },
+      { id: "meal_lunch", label: "What do you usually eat for lunch?", type: "textarea" },
+      { id: "meal_snack2", label: "Afternoon snack?", type: "text" },
+      { id: "meal_supper", label: "What do you usually eat for supper?", type: "textarea" },
+      { id: "meal_evening", label: "Anything after supper?", type: "text" },
+      { id: "snacker", label: "Do you snack?", type: "chips", options: ["Rarely", "Sometimes", "Every day", "All day long"] },
       { id: "meals", label: "Meals per day", type: "chips", options: ["1–2", "3", "4", "5+"] },
       { group: [
         { id: "first_meal", label: "First meal of the day", type: "chips", options: ["Before 8 am", "8–10 am", "10 am–noon", "After noon"] },
-        { id: "last_meal", label: "Last food of the day", type: "chips", options: ["Before 7 pm", "7–9 pm", "9–11 pm", "After 11 pm"] } ] },
+        { id: "last_meal", label: "When do you stop eating at night?", type: "chips", options: ["Before 7 pm", "7–9 pm", "9–11 pm", "After 11 pm"] } ] },
       { id: "protein_meals", label: "How many of your meals have a palm-sized (or bigger) serving of protein?", help: "Meat, fish, eggs, Greek yogurt, tofu, a protein shake…", type: "chips", options: ["0", "1", "2", "3+"] },
       { group: [
         { id: "am_appetite", label: "Appetite in the morning", type: "chips", options: ["Not hungry", "A little", "Hungry"] },
@@ -511,6 +535,15 @@ const SECTIONS = [
       { id: "water", label: "Water per day", type: "chips", options: ["Under 1 L", "1–2 L", "2–3 L", "3 L+"] },
       { id: "alcohol", label: "Alcoholic drinks per week", type: "chips", options: ["None", "1–3", "4–7", "8–14", "15+"] },
       { id: "caffeine", label: "Coffee / caffeine per day", type: "chips", options: ["None", "1–2 cups", "3–4 cups", "5+ cups"] },
+      { group: [
+        { id: "gluten", label: "Do you eat gluten (bread, pasta, wheat)?", type: "chips", options: ["Daily", "Sometimes", "Rarely", "I avoid it"] },
+        { id: "dairy", label: "Do you eat dairy (milk, yogurt, cheese)?", type: "chips", options: ["Daily", "Sometimes", "Rarely", "I avoid it"] } ] },
+      { id: "gluten_why", label: "Why do you avoid gluten?", type: "chips", options: ["Diagnosed celiac", "I feel better without it", "Preference"], show: d => d.gluten === "I avoid it" },
+      { id: "dairy_why", label: "Why do you avoid dairy?", type: "chips", options: ["Lactose intolerant", "Milk allergy", "I feel better without it", "Preference"], show: d => d.dairy === "I avoid it" },
+      { id: "wl_past", label: "Have you lost weight in the past?", type: "chips", options: ["No", "Yes, and kept it off", "Yes, but regained some", "Yes, but regained it all or more"] },
+      { group: [
+        { id: "wl_amount", label: "How much?", type: "number", unit: wu, show: d => d.wl_past && d.wl_past !== "No" },
+        { id: "wl_how", label: "How did you do it?", type: "text", show: d => d.wl_past && d.wl_past !== "No" } ] },
       { id: "diet_count", label: "How many serious diets have you done?", type: "chips", options: ["None", "1–2", "3–5", "6+"] },
       { id: "last_diet", label: "Your most recent diet", type: "chips", options: ["I'm dieting now", "Ended within 3 months", "Ended 3–12 months ago", "Over a year ago", "Never dieted"] },
       { id: "diet_weeks", label: "How many weeks into this diet are you?", type: "number", unit: "weeks", show: d => d.last_diet === "I'm dieting now" },
@@ -533,7 +566,10 @@ const SECTIONS = [
         { id: "bed_wake", label: "Usual bedtime (and weekend times if different)", type: "text" } ] },
       { group: [
         { id: "sleep_latency", label: "Time to fall asleep", type: "chips", options: ["Under 15 min", "15–30 min", "30–60 min", "Over an hour"] },
-        { id: "wake_night", label: "Wake during the night?", type: "chips", options: ["Rarely", "Once", "2+ times", "Same time most nights"] } ] },
+        { id: "wake_night", label: "Do you wake up in the middle of the night?", type: "chips", options: ["Rarely", "Once", "2+ times", "Same time most nights"] } ] },
+      { id: "wake_clock", label: "What time do you usually wake up?", type: "multi", options: ["Before midnight", "12–1 am", "1–3 am", "3–5 am", "It varies"], show: d => d.wake_night && d.wake_night !== "Rarely" },
+      { id: "wake_why", label: "What wakes you?", type: "multi", options: ["To pee", "Hot or sweating", "Mind racing", "Hungry", "Noise, kids or pets", "Pain", "Not sure"], show: d => d.wake_night && d.wake_night !== "Rarely" },
+      { id: "wake_back", label: "Can you fall back asleep?", type: "chips", options: ["Within 15 min", "After 30+ min", "Rarely"], show: d => d.wake_night && d.wake_night !== "Rarely" },
       { id: "rested", label: "Do you wake up feeling rested?", type: "chips", options: ["Most days", "Some days", "Rarely"] },
       { id: "snore", label: "Do you snore, or has anyone noticed you stop breathing or gasp at night?", type: "chips", options: ["No", "I snore", "Snoring with gasping or pauses", "Don't know"] },
       { group: [
@@ -722,7 +758,7 @@ document.addEventListener("click", e => {
     const id = chip.dataset.chip, v = chip.dataset.v;
     if (chip.dataset.multi === "1") {
       const arr = new Set(data[id] || []);
-      const exclusive = /^(None|None of these|None yet|No issues|No dips|None \/ not sure|None noticed)$/;
+      const exclusive = /^(None|None of these|None yet|No issues|No dips|None \/ not sure|None noticed|Not sure|It varies)$/;
       if (arr.has(v)) arr.delete(v); else {
         if (exclusive.test(v)) arr.clear(); else [...arr].forEach(a => exclusive.test(a) && arr.delete(a));
         arr.add(v);
@@ -881,6 +917,13 @@ function medicalProtocol(d, c) {
   if (meds.includes("Thyroid medication")) out.push(["Thyroid", "Same time every day, on an empty stomach", "Keep coffee, calcium and iron supplements away from the dose as the pharmacist advises. Don't change anything without the doctor."]);
   if (meds.includes("Blood thinner")) out.push(["Blood thinner", "No new supplements without the doctor", "Includes fish oil, vitamin E, turmeric and high-dose garlic. Bruising easily is common; report anything unusual."]);
   if (meds.includes("Antidepressant or anti-anxiety")) out.push(["Mood medication", "Expect appetite or weight changes; judge progress on trends", "Don't add St John's wort, 5-HTP or similar supplements without the doctor."]);
+  const cond = d.conditions || [];
+  if (cond.includes("High blood pressure") && !meds.includes("Blood pressure medication")) out.push(["Blood pressure", "Breathe through every rep; no breath-holding on heavy sets", "Lower sodium, more potassium-rich foods (vegetables, fruit, beans), less alcohol, and the weight loss itself all bring BP down. Recheck regularly."]);
+  if (cond.includes("Kidney disease or reduced kidney function")) out.push(["Kidneys", "Protein and creatine set by their nephrologist or renal dietitian", "Typical medical targets for kidney disease are well below gym norms (often 0.55–0.8 g/kg), so the usual high-protein plan does not apply. Avoid regular NSAID painkillers, keep BP controlled, and follow their fluid advice."]);
+  if (cond.includes("Kidney stones")) out.push(["Kidney stones", "2.5–3 L of fluid a day, lower sodium", "Get calcium from food, not mega-dose supplements. Ask their doctor which stone type they had; advice differs by type."]);
+  if (cond.includes("Fatty liver")) out.push(["Fatty liver", "Lose 7–10% of body weight gradually (over months, not weeks)", "No crash diets or long fasts. 150–300 min of activity a week plus resistance training helps even before weight drops. Cut sugary drinks and added sugar, keep alcohol to none or very little, Mediterranean-style meals."]);
+  if (cond.includes("Hepatitis or other liver disease")) out.push(["Liver disease", "No alcohol; no new supplements without their doctor", "Several supplements (e.g. green tea extract, high-dose vitamin A, some herbals) can stress the liver."]);
+  if (cond.includes("Gout")) out.push(["Gout", "Limit alcohol (especially beer), sugary drinks and large servings of organ meats and shellfish", "Stay well hydrated; lose weight gradually, since rapid loss can trigger flares."]);
   if (c.lip.concern) {
     const L = [];
     L.push(["Cholesterol: weight", "Losing 5–10% of body weight is the first lever", "It improves LDL, triglycerides and HDL together."]);
@@ -904,6 +947,7 @@ function fatLossStart(d, c) {
   rows.push(["Wk 1–2 · baseline", "No calorie cut yet", `Daily morning weigh-in (judge the weekly average), waist and photos. ${c.lowEater ? "Eat regular meals and start the protein ramp-up." : "Start the 2 chosen habits."} This finds real maintenance before anything changes.`]);
   rows.push(["Wk 3 · first cut", c.lowEater ? "Still no cut: build the eating habit first" : `Drop about ${fmt(r50(Math.max(250, c.tdee - c.target)))} kcal a day`, "Take it from carbs furthest from training and from added fats; protein never drops. Untracked clients: one less cupped hand of carbs at 2 meals."]);
   rows.push(["Every 2 weeks · adjust", rate ? `Target about ${rate} ${u} a week` : "Adjust by the trend", `Losing slower than target for 2 weeks: cut another 100–150 kcal or add 1,000–2,000 daily steps. Losing faster than 1% of body weight a week: add 100–150 kcal back.`]);
+  if (d.wl_past === "Yes, but regained it all or more" || d.wl_past === "Yes, but regained some") rows.push(["Past regain", `Lost ${d.wl_amount ? d.wl_amount + " " + u + " " : ""}before${d.wl_how ? " (" + d.wl_how + ")" : ""}, then regained`, "Go slower than last time, keep the habits that will survive after the diet, and plan the maintenance phase before it starts. Ask what made it stop working."]);
   rows.push(["Activity", "Steps before cardio", "Raise daily steps first. Don't add training volume for fat loss; strength training is there to keep muscle."]);
   if (lean) rows.push(["Refeed (lean clients)", "One higher-carb day a week at maintenance", "Extra carbs from rice, potatoes and fruit; fat kept low. Helps training quality and diet fatigue."]);
   rows.push(["Wk 12–13 · diet break", "Maintenance calories during the deload week", "Diet phases run 8–12 weeks, then a maintenance break. Fat loss resumes in block 2 if needed."]);
@@ -940,7 +984,7 @@ function proteinRamp(d, c) {
   if (current >= target * 0.9) return { current, target, steps: [], ok: true };
   const steps = []; let g = current, w = 1;
   while (g < target && steps.length < 8) { g = Math.min(target, g + 20); steps.push({ weeks: `Wk ${w}–${w + 1}`, g }); w += 2; }
-  const fr = d.food_rel || [], dairyBad = (d.trigger_foods || []).includes("Dairy"), veg = ["Vegetarian", "Vegan"].includes(d.diet_style);
+  const fr = d.food_rel || [], dairyBad = (d.trigger_foods || []).includes("Dairy") || d.dairy === "I avoid it", veg = ["Vegetarian", "Vegan"].includes(d.diet_style);
   const shakeOk = d.shakes !== "No";
   const powder = dairyBad || d.diet_style === "Vegan" || d.shakes === "Only dairy-free" ? "whey isolate or a pea/soy protein" : "whey";
   const foods = veg ? (d.diet_style === "Vegan" ? "tofu, tempeh, seitan, edamame, lentils, soy milk" : "eggs, Greek yogurt or skyr, cottage cheese, tofu, tempeh, lentils") : "eggs, Greek yogurt or skyr, cottage cheese, chicken, canned tuna or salmon, lean beef";
@@ -957,6 +1001,31 @@ function proteinRamp(d, c) {
   if (num(d.hunger) != null && num(d.hunger) <= 4) tips.push("Low appetite: liquid protein and softer foods (yogurt, eggs, shakes, soups) are easier than big plates of meat.");
   if (fr.some(x => x === "History of an eating disorder" || x === "Feeling out of control around food")) tips.push("Frame it as adding foods, never removing them; no tracking needed, count protein servings instead.");
   return { current, target, steps, actions, tips, estimated: num(d.protein_avg) == null };
+}
+
+// Meal-by-meal review for the consult: what they eat now and the first change to discuss
+function mealReview(d, c) {
+  const P = /egg|yog|skyr|protein|whey|shake|chicken|turkey|beef|steak|pork|ham|fish|salmon|tuna|shrimp|cottage|tofu|tempeh|lentil|bean|meat|jerky|cheese/i;
+  const V = /salad|veg|broccoli|spinach|pepper|carrot|greens|lettuce|tomato|cucumber|zucchini|asparagus|kale|cauliflower|green beans|soup/i;
+  const SW = /cookie|chip|chocolate|candy|pastry|muffin|donut|doughnut|croissant|cake|ice cream|soda|pop|juice|granola bar|cereal bar|sweet/i;
+  const rows = [];
+  const meals = [["Breakfast", d.meal_bfast], ["Morning snack", d.meal_snack1], ["Lunch", d.meal_lunch], ["Afternoon snack", d.meal_snack2], ["Supper", d.meal_supper], ["After supper", d.meal_evening]];
+  meals.forEach(([k, t]) => {
+    if (!filled(t)) return;
+    const txt = String(t), none = /^(nothing|none|skip|no|n\/a|-)\b/i.test(txt.trim()), tips = [];
+    if (none) tips.push(k === "Breakfast" ? "Skips breakfast: start with a protein drink or Greek yogurt rather than a full meal" : "Nothing here; fine if the rest of the day covers protein");
+    else {
+      if (!P.test(txt) && /Breakfast|Lunch|Supper/.test(k)) tips.push("No clear protein: add a palm-sized serving");
+      if ((!V.test(txt) || /\b(no|not many|not much|few|hardly any|rarely|little)\s+(veg|vegetables|veggies|salad)/i.test(txt)) && /Lunch|Supper/.test(k)) tips.push("No vegetables: add a fist-sized serving");
+      if (SW.test(txt)) tips.push("Sweet or packaged snack: swap for fruit + protein (yogurt, jerky, cheese, nuts)");
+      if (k === "After supper") tips.push("Evening eating: set a kitchen-closed time 2–3 h before bed");
+    }
+    rows.push([k, txt, tips.join(" · ") || "Looks solid; keep it"]);
+  });
+  if (d.gluten === "I avoid it") rows.push(["Gluten", d.gluten_why === "Diagnosed celiac" ? "Celiac: strictly gluten-free" : "Avoids gluten", d.gluten_why === "Diagnosed celiac" ? "Plan meals around rice, potatoes, oats labelled gluten-free, quinoa and corn; watch sauces and cross-contamination." : "Respect it; carbs from rice, potatoes, oats, fruit and quinoa cover everything."]);
+  if (d.dairy === "I avoid it") rows.push(["Dairy", d.dairy_why || "Avoids dairy", d.dairy_why === "Lactose intolerant" ? "Lactose-free milk, Greek yogurt and whey isolate are usually tolerated." : "Protein from eggs, meat, fish, tofu and a plant or isolate protein powder; calcium from fortified alternatives, greens and canned fish with bones."]);
+  if (d.snacker === "All day long") rows.push(["Snacking", "Snacks all day", "Move to 3–4 set meals with protein; one planned snack. Grazing usually hides a lot of calories."]);
+  return rows;
 }
 
 function nutritionProtocol(d, c) {
@@ -1002,7 +1071,7 @@ function nutritionProtocol(d, c) {
   if (["4–7", "8–14", "15+"].includes(d.alcohol)) out.push(["Alcohol", "Max 2 nights a week, never the night before training", "Count drinks in the calorie target if tracking."]);
   if (num(d.hunger) >= 7) out.push(["Hunger", "High hunger: higher-volume, high-protein meals", "Lean protein, potatoes, fruit and vegetables first; keep a deficit small in month 1."]);
   if (d.weekend === "Very different") out.push(["Weekends", "Plan weekend meals on Friday", "Keep protein and meal timing the same; one planned meal out."]);
-  const sup = ["Creatine monohydrate 3–5 g daily"];
+  const sup = (d.conditions || []).includes("Kidney disease or reduced kidney function") ? ["No creatine unless their nephrologist approves"] : ["Creatine monohydrate 3–5 g daily"];
   if ((c.ramp && !c.ramp.ok && d.shakes !== "No") || !(d.protein_src || []).length) sup.push("Whey or plant protein to close the protein gap");
   if (d.fish !== "2+ times") sup.push("Omega-3 (fish oil) if fatty fish is under twice a week");
   if (d.daylight !== "Most days" || d.bloodwork !== "Within 12 months") sup.push("Vitamin D: test first, then supplement to the result");
@@ -1019,6 +1088,14 @@ function recoveryProtocol(d, c) {
     const bed = wakeH - 8.25;
     out.push(["Sleep window", `Lights out by ${clock(bed)} · up at ${clock(wakeH)}`, "8 hours in bed, same wake time 7 days a week (weekends within 1 hour)."]);
     out.push(["Caffeine", `None after ${clock(bed - 9)}`, d.caff_cut === "2–5 pm" || d.caff_cut === "After 5 pm" ? `Currently drinking caffeine ${d.caff_cut.toLowerCase()}; move it earlier.` : "Keep caffeine 8–10 hours away from bedtime."]);
+  }
+  const wc = d.wake_clock || [], ww = d.wake_why || [];
+  if (d.wake_night && d.wake_night !== "Rarely") {
+    if (ww.includes("To pee")) out.push(["Waking to pee", "Most fluids before 7 pm; no alcohol or caffeine late", "If it's 2+ times a night after that, the doctor should check for sleep apnea, blood sugar and (in men) the prostate. Up to half of people with sleep apnea wake to urinate."]);
+    if (wc.includes("1–3 am")) out.push(["Waking 1–3 am", "Look at alcohol, late heavy meals and evening stress", "Alcohol wears off a few hours after drinking and fragments sleep, and a big late meal can swing blood sugar. Traditional Chinese medicine calls 1–3 am the liver's hour; that idea isn't proven, but the practical fixes overlap: no alcohol within 3 hours of bed and a protein-and-fibre supper 2–3 hours before sleep."]);
+    if (wc.includes("3–5 am")) out.push(["Waking 3–5 am", "Stress, mood and sleep apnea come first", "Cortisol naturally starts rising around 2–4 am, and stress or anxiety can make that rise wake you. Early waking that won't settle is a classic sign of low mood, and apnea gets worse in late-night sleep. Daily wind-down, a fixed wake time, and a doctor check if mood is low or they snore." + (d.sex === "Female" && num(d.age) >= 40 ? " Perimenopause night sweats are another common cause at this age." : "")]);
+    if (ww.includes("Hungry")) out.push(["Waking hungry", "More protein and fibre at supper", "Under-eating during the day shows up at night; check total intake before cutting anything."]);
+    if (ww.includes("Mind racing")) out.push(["Racing mind", "Write tomorrow's list before bed; 5 min slow breathing in bed", "If they can't fall back asleep within 20 minutes, get up in dim light and return when sleepy."]);
   }
   const wind = [];
   if (d.screens === "Yes") wind.push("screens off 60 min before bed");
@@ -1038,6 +1115,22 @@ function recoveryProtocol(d, c) {
   const tools = (d.recovery_tools || []).filter(x => x !== "None");
   out.push(["Recovery work", "Easy walk or 10 min mobility on rest days" + (c.map && c.map.issues.length ? ", targeting the MAP restrictions" : ""), tools.length ? `Keep: ${tools.join(", ").toLowerCase()}.` : "Start with walks; add anything else later."]);
   return out;
+}
+
+// Below Advanced: foundation → basic lifts + KILO split → deload → GBC 6-12-25 (hypertrophy, strength-biased A series)
+function slowPlan(d, c) {
+  const R = COACH_RULES, [ga, gb, gc] = R.gbc, L = Math.max(R.firstMonthsDays, c.laterDays || 2);
+  const jump = c.older ? "+1–2%" : "+2–3%";
+  const found = (n, stage, reps) => ({ name: `Foundation ${n}`, train: `${R.firstMonthsDays}×/wk full body · one limb at a time · A 3–4 × ${reps} constant load · B 3 × 12 · C building blocks stage ${stage} · 4-0-1-0` });
+  const basics = n => ({ name: "Basic lifts + KILO split", train: `${c.afterSplit} · basic lifts introduced (goblet / heels-elevated squat, trap-bar deadlift, DB presses, rows, chin-ups) · A 4 × 10 → 4 × 8 · B 3 × 10–12 · C building blocks stage 3 · ${jump} when all reps are clean` });
+  const gbc = (n, aSets, cSets) => ({ name: `GBC ${ga}-${gb}-${gc} · ${n}`, train: `${c.afterSplit} · A ${aSets} × ${ga} (step loading, strength focus) · B 3 × ${gb} · C ${cSets} × ${gc} · short rests on B/C, full rest on A · ${jump} on A when all reps are clean` });
+  const plan = c.older
+    ? [found(1, 1, "12–15"), found(2, 2, "10–12"), found(3, 3, "10–12")]
+    : c.tier === 2
+    ? [found(1, 1, "10–12"), basics(), { name: "KILO split · intensification", train: `${c.afterSplit} · A 5 × 8 (step loading) · B 3 × 10 · C building blocks · ${jump}` }]
+    : [found(1, 1, "12–15"), found(2, 2, "10–12"), basics()];
+  plan.push(...(c.older ? [basics(), gbc("intro", 4, 2), gbc("build", 5, 3)] : [gbc("intro", 4, 2), gbc("build", 5, 3), gbc("peak + retest", 5, 3)]));
+  return plan;
 }
 
 function roadmap(d, c) {
@@ -1062,6 +1155,7 @@ function roadmap(d, c) {
   const monthOf = w => Math.min(NU.length - 1, Math.floor((w - 1 - (w > P.blockWeeks ? P.deloadWeeks : 0)) / P.reassessEvery));
   const qualities = adv ? (KILO.focus[g] || ["Hypertrophy", "Relative strength"]) : ["Hypertrophy", "Hypertrophy (6+ reps)"];
   const phaseWeeks = adv ? 3 : R.phaseWeeks;
+  if (!adv) c.slowPlan = slowPlan(d, c);
   const perBlock = Math.round(P.blockWeeks / phaseWeeks);
   const rows = [];
   let wk = 1, idx = 0;
@@ -1073,10 +1167,8 @@ function roadmap(d, c) {
         const q = qualities[b] || qualities[0], m = KILO.advanced[q][i % 4], meth = KILO.methods[q][i % 4];
         name = `${q} · ${m[0]}`; train = `A series ${m[2]} @ ~${m[1]}% · ${meth} · ${c.days || 4}×/wk`;
       } else {
-        const m = KILO.slow[Math.min(idx, KILO.slow.length - 1)], days = b === 0 ? F : L;
-        const limbs = uni || (uni1 && b === 0) ? "one limb at a time" : uni1 ? "unilateral + some bilateral" : "";
-        name = `${m[0]} ${b * perBlock + i + 1}`;
-        train = `A series ${m[2]} @ ~${m[1]}% · ${m[3]} · ${days}×/wk · ${limbs} · building blocks stage ${b === 0 ? i + 1 : "3+"}`;
+        const ph = c.slowPlan[idx] || c.slowPlan[c.slowPlan.length - 1];
+        name = ph.name; train = ph.train;
       }
       const inside = checks.filter(w => w >= w0 && w <= w1);
       const test = inside.map(w => w === finalWeek ? `Wk ${w}: final retest (MAP, structural balance, body comp) · renewal review` : w % blockLen === P.blockWeeks ? `Wk ${w}: full reassessment (MAP, structural balance, body comp)` : `Wk ${w}: monthly check (weight trend, measurements, photos, MAP retest)`).join(" · ") || "Weekly check-ins";
@@ -1170,10 +1262,14 @@ function calc(d) {
   const SPLITS = { 2: "Full body × 2", 3: "Full body × 3", 4: "Upper / Lower × 2", 5: "Upper / Lower + Push / Pull / Legs", 6: "Push / Pull / Legs × 2" };
   const slow = tier == null || tier < COACH_RULES.advancedTier;
   const laterDays = days ? Math.min(days, COACH_RULES.laterMaxDays) : COACH_RULES.laterMaxDays;
+  const older = age != null && age >= COACH_RULES.ageSlow;
+  const foundWeeks = older ? COACH_RULES.foundationWeeks50 : tier === 2 ? 4 : COACH_RULES.foundationWeeks;
+  const afterSplit = laterDays >= 4 ? "Upper / Lower × 2 (KILO split)" : laterDays === 3 ? "Upper / Lower / Full body" : "Full body × 2 with basic lifts";
   const split = slow
-    ? `Full body × ${COACH_RULES.firstMonthsDays} for months 1–${COACH_RULES.firstMonths}, then full body × ${Math.max(COACH_RULES.firstMonthsDays, laterDays)}`
+    ? `Full body × ${COACH_RULES.firstMonthsDays} for weeks 1–${foundWeeks}, then ${afterSplit}`
     : days ? SPLITS[days] : null;
-  if (slow && days && days > COACH_RULES.firstMonthsDays) taNotes.push(`Client has ${days} days available; keep it to ${COACH_RULES.firstMonthsDays} sessions a week for the first ${COACH_RULES.firstMonths} months. Extra days can be walks or mobility.`);
+  if (slow && days && days > COACH_RULES.firstMonthsDays) taNotes.push(`Client has ${days} days available; keep it to ${COACH_RULES.firstMonthsDays} full-body sessions a week for the first ${foundWeeks} weeks. Extra days can be walks or mobility.`);
+  if (older) taNotes.push(`Age ${age}: clients over ${COACH_RULES.ageSlow} take longer to get back to normal. Foundation runs ${foundWeeks} weeks, load jumps stay at 1–2%, warm-ups are longer, and recovery days are protected.`);
 
   // Energy target by goal
   const g = d.goal_primary || "";
@@ -1199,6 +1295,13 @@ function calc(d) {
     const c = Math.max(0, Math.round((target - p * 4 - f * 9) / 4 / 5) * 5);
     macros = lbm ? { p, f, c, pLo: Math.round(lbm * 2.2), pHi: Math.round(lbm * 2.8), basis: "lean mass" } : { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2), basis: "body weight" };
     macros.satMax = Math.round(target * 0.1 / 9);
+    if ((d.conditions || []).includes("Kidney disease or reduced kidney function")) {
+      const pk = Math.round(kg * 0.8 / 5) * 5;
+      macros.c = Math.max(0, Math.round((target - pk * 4 - macros.f * 9) / 4 / 5) * 5);
+      Object.assign(macros, { p: pk, pLo: pk, pHi: pk, basis: "0.8 g/kg placeholder: set by their nephrologist / renal dietitian", kidneyHold: true });
+    } else if (age != null && age >= COACH_RULES.ageSlow && macros.p < kg * 1.4) {
+      macros.p = Math.round(kg * 1.4 / 5) * 5; macros.c = Math.max(0, Math.round((target - macros.p * 4 - macros.f * 9) / 4 / 5) * 5); macros.basis += " (raised for age 50+)";
+    }
   }
 
   const calAvg = num(d.cal_avg);
@@ -1227,6 +1330,20 @@ function calc(d) {
   if (d.sick === "4+") flags.push(["warn", "Sick 4+ times a year. Prioritise sleep and protein; suggest blood work (including vitamin D)."]);
   map.issues.forEach(i => flags.push(["warn", "MAP: " + i]));
   lip.flags.forEach(f => flags.push(f));
+  const cl = num(d.commit_len === "Under 3 months" ? 2 : d.commit_len === "3–6 months" ? 4 : d.commit_len ? 12 : null);
+  if (cl != null && cl < COACH_RULES.minCommitMonths) flags.unshift(["crit", `Commitment "${d.commit_len}" is under the ${COACH_RULES.minCommitMonths}-month minimum. Not a fit unless they commit to at least 6 months.`]);
+  if (age != null && age >= COACH_RULES.ageSlow) flags.push(["warn", `Age ${age}: expect a slower return to normal. Longer foundation, smaller load jumps, protein at least 1.2–1.6 g/kg with 0.4 g/kg per meal.`]);
+  const bpm = String(d.bp || "").match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
+  if (bpm) { const sy = +bpm[1], di = +bpm[2]; if (sy >= 160 || di >= 100) flags.push(["crit", `Blood pressure ${sy}/${di}: get doctor clearance before hard training.`]); else if (sy >= 140 || di >= 90) flags.push(["warn", `Blood pressure ${sy}/${di} is high. Avoid breath-holding on heavy sets; recheck regularly.`]); }
+  const cond = d.conditions || [];
+  if (cond.includes("Kidney disease or reduced kidney function")) flags.push(["crit", "Kidney disease: protein target and any creatine must be set or cleared by their nephrologist or renal dietitian. High-protein targets are on hold."]);
+  if (cond.includes("Hepatitis or other liver disease")) flags.push(["crit", "Liver disease: no alcohol, and no new supplements without their doctor (many supplements stress the liver)."]);
+  if (d.drugs === "Regular" || (d.drugs === "Occasional" && (d.drug_type || []).includes("Cocaine or other stimulants"))) flags.push(["crit", "Current drug use" + ((d.drug_type || []).length ? ` (${d.drug_type.join(", ").toLowerCase()})` : "") + ". Stimulants plus hard training stress the heart; talk about it openly and involve a doctor."]);
+  else if (d.drugs === "Occasional") flags.push(["warn", "Occasional drug use: watch sleep, appetite and recovery after use days."]);
+  else if (d.drugs === "Former") flags.push(["ok", "Former drug use" + (d.drug_when ? ` (stopped ${d.drug_when})` : "") + ". Keep routines stable; structure helps."]);
+  if (d.alc_binge === "Weekly or more") flags.push(["warn", "Binge drinking weekly or more. Big effect on sleep, recovery and fat loss; make it part of the nutrition conversation."]);
+  if (d.smoke === "Current smoker" || d.smoke === "Vape") flags.push(["warn", `${d.smoke === "Vape" ? "Vapes" : "Smokes"}${d.smoke_note ? " (" + d.smoke_note + ")" : ""}. Higher cardiovascular risk; encourage a quit plan with their doctor.`]);
+  if ((d.wake_why || []).includes("To pee") && ["2+ times", "Same time most nights"].includes(d.wake_night)) flags.push(["warn", "Wakes to pee most nights. Common causes include late fluids or alcohol, sleep apnea, blood sugar and prostate issues; worth a doctor visit if it persists."]);
   if (d.statin_muscle === "Yes, it bothers me") flags.push(["crit", "Statin with bothersome muscle symptoms. Client should tell their doctor before training starts; keep loads light and eccentrics short until cleared."]);
   if ((d.meds_list || []).includes("Insulin")) flags.push(["warn", "On insulin. Ask about low blood sugar episodes; have fast carbs on hand at sessions."]);
   if ((d.meds_list || []).includes("Blood thinner")) flags.push(["warn", "On a blood thinner. No supplements (fish oil, vitamin E, turmeric, etc.) without their doctor's OK."]);
@@ -1247,12 +1364,13 @@ function calc(d) {
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
   const out = { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
-    lifts, recovery, split, slow, laterDays, days, phase, ratePct, rateKg, target, macros, lowEater, comp, lbm, bmrMethod, lip, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
+    lifts, recovery, split, slow, older, foundWeeks, laterDays, afterSplit, days, phase, ratePct, rateKg, target, macros, lowEater, comp, lbm, bmrMethod, lip, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
   out.ramp = proteinRamp(d, out);
   out.medical = medicalProtocol(d, out);
   out.fatStart = fatLossStart(d, out);
   out.agreement = nutritionAgreement(d, out);
   out.nutrition = nutritionProtocol(d, out);
+  out.meals = mealReview(d, out);
   out.recoveryPlan = recoveryProtocol(d, out);
   out.roadmap = roadmap(d, out);
   return out;
@@ -1260,10 +1378,10 @@ function calc(d) {
 
 /* ---------- Coach report ---------- */
 function setView(v) {
-  $("#tab-form").setAttribute("aria-selected", v === "form"); $("#tab-report").setAttribute("aria-selected", v === "report");
-  $("#view-form").hidden = v !== "form"; $("#view-report").hidden = v !== "report";
+  ["form", "report", "library"].forEach(k => { $("#tab-" + k).setAttribute("aria-selected", v === k); $("#view-" + k).hidden = v !== k; });
   if (v === "report") renderReport();
-  try { history.replaceState(null, "", v === "report" ? "#report" : "#form"); } catch (e) {}
+  if (v === "library") renderLibrary();
+  try { history.replaceState(null, "", "#" + v); } catch (e) {}
   window.scrollTo({ top: 0 });
 }
 function fmt(n, d = 0) { return n == null ? "–" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d }); }
@@ -1289,7 +1407,9 @@ function renderReport() {
       <div><div class="eyebrow">Coach report · ${new Date().toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>
         <h2 style="font-size:36px">${esc(data.name || "Unnamed client")}</h2>
         <div style="color:var(--muted)">${[data.age && data.age + " yrs", data.sex, data.wt && data.wt + " " + u, c.bmi && "BMI " + fmt(c.bmi, 1), data.occupation].filter(Boolean).map(esc).join(" · ")}</div>
-        <div style="margin-top:4px">${esc(goalLine)}</div></div>
+        <div style="margin-top:4px">${esc(goalLine)}</div>
+        ${data.goal_6mo || data.goal_1yr ? `<div style="margin-top:6px;font-size:14px;max-width:70ch">${data.goal_6mo ? `<b>6 months:</b> ${esc(data.goal_6mo)}<br>` : ""}${data.goal_1yr ? `<b>1 year:</b> ${esc(data.goal_1yr)}` : ""}</div>` : ""}
+        ${data.commit_len ? `<div style="margin-top:4px;font-size:13px;color:var(--muted)">Commitment: ${esc(data.commit_len)} · readiness ${esc(data.commit || "–")}/10</div>` : ""}</div>
       <div class="utility no-print">
         <button class="btn primary" type="button" id="copyRep">Copy report</button>
         <button class="btn" type="button" id="dlRep">Download .txt</button>
@@ -1311,7 +1431,7 @@ function renderReport() {
           <dt>Limbs</dt><dd>${esc(c.program.structure)}</dd>
           ${(c.slow ? KILO.series.slow : KILO.series.advanced).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}
         </dl>` : ""}
-        <ul class="plain">${c.program ? `<li>${esc(c.program.methods)}.</li><li>${esc(KILO.loading)}</li>` : ""}
+        <ul class="plain">${c.program ? `<li>${esc(c.program.methods)}.</li><li>${esc(KILO.strengthBias)}</li><li>${esc(KILO.loading)}${c.older ? " Age 50+: keep jumps at 1–2%." : ""}</li>` : ""}
           ${c.taNotes.map(n => `<li>${esc(n)}</li>`).join("")}
           ${c.map.regressed.length ? `<li><b>MAP regressions:</b> ${esc(c.map.regressed.map(r => r.name + " → " + r.start).join("; "))}.</li>` : ""}
           ${c.sb.weak.length ? `<li><b>Weak links from structural balance:</b> ${esc(c.sb.weak.slice(0, 3).map(r => r.fix.split(":")[0]).join("; "))}. Fix these in phase 1 before pushing the base lifts.</li>` : ""}
@@ -1371,6 +1491,7 @@ function renderReport() {
     </div>
 
     ${c.fatStart ? `<div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Fat-loss start · block 1</h3><dl class="proto">${protoHTML(c.fatStart)}</dl></div>` : ""}
+    ${c.meals.length ? `<div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>What they eat now</h3><p style="margin:0;color:var(--muted);font-size:14px">Use this to run the nutrition conversation at the consult: their words on the left, the first change to discuss on the right.</p><dl class="proto">${c.meals.map(([k, a, b]) => `<dt>${esc(k)}</dt><dd><b>${esc(a)}</b><span>${esc(b)}</span></dd>`).join("")}</dl></div>` : ""}
     <div class="card"><h3><span class="dot" style="background:var(--p-green)"></span>Nutrition agreement</h3><p style="margin:0;color:var(--muted);font-size:14px">Loose rules the client agrees to at the consult. Fewer rules, followed, beat a perfect plan that isn't.</p><dl class="proto">${protoHTML(c.agreement)}</dl></div>
     ${c.medical.length ? `<div class="card"><h3><span class="dot" style="background:var(--crit)"></span>Medications & cholesterol</h3><p style="margin:0;color:var(--muted);font-size:14px">Coaching guidance only. Medical decisions stay with the client's doctor and pharmacist.</p><dl class="proto">${protoHTML(c.medical)}</dl></div>` : ""}
     <div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Nutrition protocol</h3><dl class="proto">${protoHTML(c.nutrition)}</dl></div>
@@ -1542,6 +1663,9 @@ function answersHTML() {
 function reportText() {
   const c = calc(data), u = wu(data), L = [];
   L.push(`STARTING POINT ASSESSMENT — ${data.name || "Unnamed client"}`, new Date().toDateString(), "");
+  if (data.goal_6mo) L.push(`6-month goal: ${data.goal_6mo}`);
+  if (data.goal_1yr) L.push(`1-year goal: ${data.goal_1yr}`);
+  if (data.commit_len) L.push(`Commitment: ${data.commit_len} · readiness ${data.commit || "–"}/10`, "");
   if (isExample) L.push("(EXAMPLE CLIENT)", "");
   L.push("FLAGS"); c.flags.forEach(([s, t]) => L.push(`- [${s === "crit" ? "ACT" : s === "warn" ? "WATCH" : "CLEAR"}] ${t}`));
   L.push("", "TRAINING AGE & PROGRAM TYPE",
@@ -1555,6 +1679,7 @@ function reportText() {
     `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
   if (c.comp.bf != null) L.push("", "BODY COMPOSITION", `- ${c.comp.bf}% body fat (${data.bf_method || "method not set"}) · ${c.comp.cat} · lean mass ${fmt(c.fromKg(c.comp.lean), 1)} ${u}${c.comp.goalKg ? ` · at ${c.comp.target}%: ${fmt(c.fromKg(c.comp.goalKg))} ${u}` : ""}${c.comp.whtr ? ` · waist/height ${c.comp.whtr.toFixed(2)}` : ""}`);
   if (c.fatStart) { L.push("", "FAT-LOSS START"); c.fatStart.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`)); }
+  if (c.meals.length) { L.push("", "WHAT THEY EAT NOW"); c.meals.forEach(([k, a, b]) => L.push(`- ${k}: ${a} → ${b}`)); }
   L.push("", "NUTRITION AGREEMENT"); c.agreement.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`));
   if (c.medical.length) { L.push("", "MEDICATIONS & CHOLESTEROL (coaching guidance; medical decisions stay with the doctor)"); c.medical.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`)); }
   L.push("", "BUILDING BLOCKS (block 1, 4-week stages)"); BUILDING_BLOCKS.forEach(b => { const why = blockPriority(b, c); L.push(`- ${b.area}${why.length ? " [PRIORITY: " + why.join(", ") + "]" : ""}: ${b.stages.join(" → ")}`); });
@@ -1575,6 +1700,116 @@ function reportText() {
   return L.join("\n");
 }
 
+
+/* ---------- Program library ---------- */
+// KILO rep schemes (A series), % of 1RM and total reps (or reps per set for ranges, drop sets and clusters)
+const REP_SCHEMES = [{"pct": 40, "s": "40–50", "vol": 50, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 45, "s": "30–40", "vol": 40, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 50, "s": "20–30", "vol": 30, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 50, "s": "30/15/15", "vol": 60, "q": "Strength endurance", "t": "Drop set", "perSet": true}, {"pct": 50, "s": "50,30,20", "vol": 100, "q": "Strength endurance", "t": "Descending reps", "perSet": false}, {"pct": 53, "s": "20,20,50", "vol": 90, "q": "Strength endurance", "t": "Paler system ascending", "perSet": false}, {"pct": 55, "s": "20–25", "vol": 25, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 60, "s": "15,15,30", "vol": 60, "q": "Strength endurance", "t": "Paler system ascending", "perSet": false}, {"pct": 60, "s": "15–20", "vol": 20, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 60, "s": "20/10/10", "vol": 40, "q": "Strength endurance", "t": "Drop set", "perSet": true}, {"pct": 60, "s": "20/20/20", "vol": 60, "q": "Strength endurance", "t": "Drop set", "perSet": true}, {"pct": 61, "s": "10,15,20,30", "vol": 75, "q": "Strength endurance", "t": "Ascending reps", "perSet": false}, {"pct": 61, "s": "30,20,15,10", "vol": 75, "q": "Strength endurance", "t": "Descending reps", "perSet": false}, {"pct": 66, "s": "12–15", "vol": 15, "q": "Strength endurance", "t": "Standard sets", "perSet": true}, {"pct": 66, "s": "15/15/15", "vol": 45, "q": "Strength endurance", "t": "Drop set", "perSet": true}, {"pct": 67, "s": "12,12,20", "vol": 44, "q": "Strength endurance", "t": "Paler system ascending", "perSet": false}, {"pct": 68, "s": "10,12,15,20", "vol": 57, "q": "Strength endurance", "t": "Ascending reps", "perSet": false}, {"pct": 68, "s": "20,15,12,10", "vol": 57, "q": "Strength endurance", "t": "Descending reps", "perSet": false}, {"pct": 70, "s": "10–12", "vol": 12, "q": "Hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 70, "s": "12/10/8", "vol": 30, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 70, "s": "15,12,10", "vol": 37, "q": "Hypertrophy", "t": "Descending reps", "perSet": false}, {"pct": 71, "s": "15,12,10,10", "vol": 47, "q": "Hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 72, "s": "9–11", "vol": 11, "q": "Hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 73, "s": "12,10,8,12", "vol": 42, "q": "Hypertrophy", "t": "Back-off set", "perSet": false}, {"pct": 73, "s": "12,12,10,10,8", "vol": 52, "q": "Hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 74, "s": "10/10/10", "vol": 30, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 74, "s": "10/8/6", "vol": 24, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 74, "s": "10/8/8", "vol": 26, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 74, "s": "12,10,8,6,15", "vol": 51, "q": "Hypertrophy", "t": "Back-off set", "perSet": false}, {"pct": 74, "s": "8–10", "vol": 10, "q": "Hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 75, "s": "12,10,8,8", "vol": 38, "q": "Hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 75, "s": "8,8,8,12,12", "vol": 48, "q": "Hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 76, "s": "10,10,8,8,8", "vol": 44, "q": "Hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 76, "s": "12,10,8,6", "vol": 36, "q": "Hypertrophy", "t": "Descending reps", "perSet": false}, {"pct": 76, "s": "12,8,8,8", "vol": 36, "q": "Hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 76, "s": "6,8,10,12", "vol": 36, "q": "Hypertrophy", "t": "Ascending reps", "perSet": false}, {"pct": 76, "s": "7–9", "vol": 9, "q": "Hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 76, "s": "9/7/5", "vol": 21, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 76, "s": "9/7/7", "vol": 23, "q": "Hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 78, "s": "10,8,6,10,8,6", "vol": 48, "q": "Functional hypertrophy", "t": "Wave loading", "perSet": false}, {"pct": 78, "s": "10,8,6,6,8,10", "vol": 48, "q": "Functional hypertrophy", "t": "Broad pyramid", "perSet": false}, {"pct": 78, "s": "11,9,7,5", "vol": 32, "q": "Functional hypertrophy", "t": "Descending reps", "perSet": false}, {"pct": 78, "s": "6–8", "vol": 8, "q": "Functional hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 78, "s": "8/6/6", "vol": 20, "q": "Functional hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 79, "s": "10,10,6,6,6", "vol": 38, "q": "Functional hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 79, "s": "6,6,6,10,10", "vol": 38, "q": "Functional hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 79, "s": "6,6,8,8,10", "vol": 38, "q": "Functional hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 79, "s": "6,7,8,9", "vol": 30, "q": "Functional hypertrophy", "t": "Ascending reps", "perSet": false}, {"pct": 79, "s": "9,8,7,6", "vol": 30, "q": "Functional hypertrophy", "t": "Descending reps", "perSet": false}, {"pct": 80, "s": "5,5,7,7,9,9", "vol": 42, "q": "Functional hypertrophy", "t": "Stage system ascending", "perSet": false}, {"pct": 80, "s": "5–7", "vol": 7, "q": "Functional hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 80, "s": "7,7,5,5,12", "vol": 36, "q": "Functional hypertrophy", "t": "Back-off set", "perSet": false}, {"pct": 80, "s": "7/5/5", "vol": 17, "q": "Functional hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 80, "s": "8,8,8,6,6", "vol": 36, "q": "Functional hypertrophy", "t": "Paler system descending", "perSet": false}, {"pct": 80, "s": "9,7,5,5,7,9", "vol": 42, "q": "Functional hypertrophy", "t": "Broad pyramid", "perSet": false}, {"pct": 80, "s": "9,7,5,9,7,5", "vol": 42, "q": "Functional hypertrophy", "t": "Wave loading", "perSet": false}, {"pct": 80, "s": "9,9,7,7,5,5", "vol": 42, "q": "Functional hypertrophy", "t": "Stage system descending", "perSet": false}, {"pct": 81, "s": "5,5,5,9,9", "vol": 33, "q": "Functional hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 81, "s": "6,6,6,8,8", "vol": 34, "q": "Functional hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 81, "s": "8,6,4,4,12", "vol": 34, "q": "Functional hypertrophy", "t": "Back-off set", "perSet": false}, {"pct": 81, "s": "8,8,6,6", "vol": 28, "q": "Functional hypertrophy", "t": "Stage system descending", "perSet": false}, {"pct": 82, "s": "4,4,8,8,8", "vol": 32, "q": "Functional hypertrophy", "t": "Paler system ascending", "perSet": false}, {"pct": 83, "s": "4,4,6,6,8,8", "vol": 36, "q": "Functional hypertrophy", "t": "Stage system ascending", "perSet": false}, {"pct": 83, "s": "4,5,6,7,8", "vol": 30, "q": "Functional hypertrophy", "t": "Ascending reps", "perSet": false}, {"pct": 83, "s": "4–6", "vol": 6, "q": "Functional hypertrophy", "t": "Standard sets", "perSet": true}, {"pct": 83, "s": "6/4/4", "vol": 14, "q": "Functional hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 83, "s": "6/6/6", "vol": 18, "q": "Functional hypertrophy", "t": "Drop set", "perSet": true}, {"pct": 83, "s": "8,6,4,4,6,8", "vol": 36, "q": "Functional hypertrophy", "t": "Broad pyramid", "perSet": false}, {"pct": 83, "s": "8,6,4,8,6,4", "vol": 36, "q": "Functional hypertrophy", "t": "Wave loading", "perSet": false}, {"pct": 83, "s": "8,7,6,5,4", "vol": 30, "q": "Functional hypertrophy", "t": "Descending reps", "perSet": false}, {"pct": 83, "s": "8,8,6,6,4,4", "vol": 36, "q": "Functional hypertrophy", "t": "Stage system descending", "perSet": false}, {"pct": 85, "s": "(3/1/1/1)", "vol": 6, "q": "Relative strength", "t": "Cluster", "perSet": true}, {"pct": 85, "s": "3,3,5,5,7,7", "vol": 30, "q": "Relative strength", "t": "Stage system ascending", "perSet": false}, {"pct": 85, "s": "3–5", "vol": 5, "q": "Relative strength", "t": "Standard sets", "perSet": true}, {"pct": 85, "s": "5/3/3", "vol": 11, "q": "Relative strength", "t": "Drop set", "perSet": true}, {"pct": 85, "s": "7,5,3,3,5,7", "vol": 30, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 85, "s": "7,5,3,7,5,3", "vol": 30, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 85, "s": "7,7,5,5,3,3", "vol": 30, "q": "Relative strength", "t": "Stage system descending", "perSet": false}, {"pct": 87, "s": "5,3,5,3,5", "vol": 21, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 88, "s": "2,2,4,4,6,6", "vol": 24, "q": "Relative strength", "t": "Stage system ascending", "perSet": false}, {"pct": 88, "s": "2–4", "vol": 4, "q": "Relative strength", "t": "Standard sets", "perSet": true}, {"pct": 88, "s": "4/2/2", "vol": 8, "q": "Relative strength", "t": "Drop set", "perSet": true}, {"pct": 88, "s": "5,4,3,3,4,5", "vol": 24, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 88, "s": "5,4,3,5,4,3", "vol": 24, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 88, "s": "5,5,5,3,3,3", "vol": 24, "q": "Relative strength", "t": "Paler system descending", "perSet": false}, {"pct": 88, "s": "6,4,2,2,4,6", "vol": 24, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 88, "s": "6,4,2,6,4,2", "vol": 24, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 88, "s": "6,6,4,4,2,2", "vol": 24, "q": "Relative strength", "t": "Stage system descending", "perSet": false}, {"pct": 90, "s": "(1/1/1/1/1)", "vol": 5, "q": "Relative strength", "t": "Cluster", "perSet": true}, {"pct": 90, "s": "2–3", "vol": 3, "q": "Relative strength", "t": "Standard sets", "perSet": true}, {"pct": 90, "s": "5,3,2,5,3,2", "vol": 20, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 91, "s": "1,2,3,4,5", "vol": 15, "q": "Relative strength", "t": "Ascending reps", "perSet": false}, {"pct": 91, "s": "5,3,3,2,2", "vol": 15, "q": "Relative strength", "t": "Paler system descending", "perSet": false}, {"pct": 91, "s": "5,4,3,2,1", "vol": 15, "q": "Relative strength", "t": "Descending reps", "perSet": false}, {"pct": 92, "s": "1,1,3,3,5,5", "vol": 18, "q": "Relative strength", "t": "Stage system ascending", "perSet": false}, {"pct": 92, "s": "1,6,1,6,1,6", "vol": 20, "q": "Relative strength", "t": "1-6 contrast", "perSet": false}, {"pct": 92, "s": "3,3,3,2,2,2", "vol": 15, "q": "Relative strength", "t": "Paler system descending", "perSet": false}, {"pct": 92, "s": "5,3,1,1,3,5", "vol": 18, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 92, "s": "5,3,1,5,3,1", "vol": 18, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 92, "s": "5,3,3,2,2,1", "vol": 16, "q": "Relative strength", "t": "Paler system descending", "perSet": false}, {"pct": 92, "s": "5,5,3,3,1,1", "vol": 18, "q": "Relative strength", "t": "Stage system descending", "perSet": false}, {"pct": 94, "s": "1–2", "vol": 2, "q": "Relative strength", "t": "Standard sets", "perSet": true}, {"pct": 95, "s": "1,1,2,2,3,3", "vol": 12, "q": "Relative strength", "t": "Stage system ascending", "perSet": false}, {"pct": 95, "s": "3,2,1,1,2,3", "vol": 12, "q": "Relative strength", "t": "Broad pyramid", "perSet": false}, {"pct": 95, "s": "3,2,1,3,2,1", "vol": 12, "q": "Relative strength", "t": "Wave loading", "perSet": false}, {"pct": 95, "s": "3,3,2,2,1,1", "vol": 12, "q": "Relative strength", "t": "Stage system descending", "perSet": false}];
+const SCHEME_TYPES = {
+  "Standard sets": { phase: "Both", level: "Beginner", note: "Most of the training year, especially for beginners. Constant load for beginners; step loading (up to 10% spread) for intermediates." },
+  "Descending reps": { phase: "Intensification", level: "Beginner+", note: "First variation after standard sets. Reps drop and load rises 2–3% per set; the last signal is intensity." },
+  "Ascending reps": { phase: "Accumulation", level: "Intermediate", note: "Heaviest set first, then lighter for more reps. Needs a longer warm-up." },
+  "Back-off set": { phase: "Accumulation", level: "Intermediate", note: "Descending sets, then one lighter high-rep set to finish on volume." },
+  "Broad pyramid": { phase: "Accumulation", level: "Intermediate", note: "Down to a double exposure at the top load, then back up in reps; about 5% between sets." },
+  "Stage system descending": { phase: "Intensification", level: "Intermediate", note: "Two sets per load, about 5% up each stage, 10% spread overall." },
+  "Stage system ascending": { phase: "Accumulation", level: "Intermediate+", note: "Heaviest stage first, then lighter stages for more reps." },
+  "Paler system descending": { phase: "Intensification", level: "Advanced", note: "2–5 exposures per load before stepping up; weight selection is critical." },
+  "Paler system ascending": { phase: "Accumulation", level: "Advanced", note: "Heaviest block of sets first; needs extra warm-up sets." },
+  "Wave loading": { phase: "Intensification", level: "Advanced", note: "Repeat the wave a little heavier (about +2% per rep target) to use potentiation. Good for peaking." },
+  "1-6 contrast": { phase: "Intensification", level: "Advanced", note: "Near-max single, then a set of 6 to use the potentiation. Advanced only." },
+  "Cluster": { phase: "Accumulation", level: "Advanced", note: "Short intra-set rests to get more reps at high intensity. Absolute and relative strength." },
+  "Drop set": { phase: "Accumulation (B/C series)", level: "Beginner+", note: "Not for the A series. Builds volume on B and C exercises." }
+};
+const minReps = sc => Math.min(...String(sc).replace(/[()]/g, "").split(/[,/–]/).map(Number).filter(n => !isNaN(n)));
+const okSlow = r => minReps(r.s) >= 6 && ["Standard sets", "Descending reps", "Drop set", "Back-off set"].includes(r.t);
+
+const KILO_MACROS = {
+  "Hypertrophy": { Beginner: [[70, "4×12"], [78, "5×8"], [72, "5×11"], [80, "5×7"]], Intermediate: [[70, "4×12"], [80, "5×7"], [74, "12,10,8,6,15"], [85, "6×5"]], Advanced: [[71, "15,12,10,10"], [83, "5×6"], [75, "8,8,8,12,12"], [88, "6×4"]] },
+  "Absolute strength": { Beginner: [[74, "4×10"], [83, "5×6"], [76, "5×9"], [85, "6×5"]], Intermediate: [[74, "4×10"], [85, "5×5"], [78, "5×8"], [90, "5,5,3,3,2,2"]], Advanced: [[74, "4×10"], [88, "5,5,5,3,3,3"], [80, "9,7,5,5,7,9"], [94, "8×2"]] },
+  "Relative strength": { Beginner: [[80, "5×7"], [88, "6×4"], [83, "6×6"], [90, "6×3"]], Intermediate: [[83, "5×6"], [88, "6,6,4,4,2,2"], [85, "6×5"], [90, "7×3"]], Advanced: [[85, "5×5"], [90, "5,5,3,3,2,2"], [88, "7×4"], [92, "3,3,3,2,2,2"]] },
+  "Power": { Beginner: [[78, "4×8"], [90, "5×3"], [80, "5×7"], [94, "6×2"]], Intermediate: [[80, "5×7"], [92, "5,3,3,2,2,1"], [83, "6×6"], [94, "7×2"]], Advanced: [[83, "5×6"], [92, "3,3,3,2,2,2"], [85, "6×5"], [95, "3,2,1,3,2,1"]] }
+};
+const MESO = ["Acc 1 · wk 1–3", "Int 1 · wk 4–6", "Acc 2 · wk 7–9", "Int 2 · wk 10–12"];
+
+const TEMPLATES = [
+  { group: "Starting Point", name: "Block 1 · beginner foundation", who: "Novice / developing, under 50", weeks: [["Wk 1–4", "2×/wk full body, one limb at a time · A 3–4×12–15 constant load · B 3×12 · C building blocks stage 1 · 4-0-1-0"], ["Wk 5–8", "2×/wk full body, unilateral · A 3–4×10–12 · building blocks stage 2"], ["Wk 9–12", "Basic lifts + KILO split (upper/lower) · A 4×10 → 4×8 · building blocks stage 3"], ["Wk 13", "Deload: ~50% volume, full reassessment"]] },
+  { group: "Starting Point", name: "Block 1 · 50+", who: "Clients 50 and over", weeks: [["Wk 1–12", "2×/wk full body for the whole block, unilateral, building blocks stages 1–3 · reps 10–15 · load jumps 1–2%"], ["Wk 13", "Deload"], ["Wk 14–17", "Basic lifts + KILO split"], ["Wk 18–25", "GBC 6-12-25 intro, then build"]] },
+  { group: "Starting Point", name: "Block 2 · GBC 6-12-25", who: "After the first 12 weeks", weeks: [["Wk 14–17", "A 4×6 (step loading, strength focus) · B 3×12 · C 2×25"], ["Wk 18–21", "A 5×6 · B 3×12 · C 3×25"], ["Wk 22–25", "A 5×6 heavier · retest 6RM, MAP and structural balance"]] },
+  { group: "Starting Point", name: "Months 7–12 · hypertrophy (renewal)", who: "Year 1, still hypertrophy", weeks: [["Wk 1–3", "4×12 @ ~70% (KILO beginner hypertrophy)"], ["Wk 4–6", "5×8 @ ~78%"], ["Wk 7–9", "5×11 @ ~72%"], ["Wk 10–12", "5×7 @ ~80%"], ["Then", "Second hypertrophy macrocycle with block-to-block +2–4% intensity"]] },
+  { group: "Starting Point", name: "Year 2 · strength", who: "Training age 1+ year, structural balance on target", weeks: [["Macro 1", "Functional hypertrophy: alternate 4×10 / 4×6 weekly (Altern8 style)"], ["Macro 2", "Relative strength, beginner: 5×7 → 6×4 → 6×6 → 6×3"]] },
+  { group: "KILO", name: "Double Altern8 · functional hypertrophy", who: "Intermediate+", weeks: [["Wk 1–6", "Weekly undulating: A series alternates 4×10 and 4×6, step loading with a 10% spread · Upper/Lower ×2"], ["Wk 7–12", "Alternates 5×8 and 5×4, 10–12% spread · exercises rotate week to week"]] },
+  { group: "KILO", name: "Relative strength macrocycle", who: "Intermediate+", weeks: [["Acc 1", "5×6, step loading"], ["Int 1", "5,5,3,3,2,2 (stage system, +5% per stage)"], ["Acc 2", "6×5, step loading"], ["Int 2", "5,3,1,5,3,1 (wave loading, second wave ~2% heavier)"]] },
+  { group: "KILO", name: "Speed-strength continuum", who: "Advanced / athletes", weeks: [["Acc 1", "5×5 step loading"], ["Int 1", "3,5 waves with velocity contrast; chains or bands (~20% accommodating resistance)"], ["Acc 2", "Complex ascending: starting-strength methods, myotatic 1/3 reps, dead-stop mid-range with bands (6×4)"], ["Int 2", "Contrast: heavy 6×2 paired with plyometrics or med-ball throws (6×6)"]] },
+  { group: "KILO", name: "Body recomposition (priority muscles)", who: "Intermediate+, recomp goal", weeks: [["Wk 1–3", "Volume load builds; accumulation and intensification days alternate (DUP)"], ["Wk 4", "Lighter week"], ["Wk 5–6", "Volume load builds higher"], ["Wk 7–12", "Second 6-week block, same wave"], ["Volume", "Priority muscles 10–20 hard sets a week; everything else at maintenance"]] },
+  { group: "Poliquin", name: "German Volume Training", who: "Intermediate+, hypertrophy", weeks: [["Phase 1", "10×10 on one lift per pair at ~60% 1RM (about a 20RM), antagonist A1/A2 pairs, 60–90 s rest, tempo prescribed"], ["Phase 2", "10×6 with a load you'd use for about 12 reps"], ["Note", "Same weight for all 10 sets; add load only when all 100 reps are done"]] },
+  { group: "Poliquin", name: "Advanced GVT · 5% method", who: "Advanced", weeks: [["Wk 1", "10×5"], ["Wk 2", "10×4, +5%"], ["Wk 3", "10×3, +5%"], ["Then", "Back to 10×5 slightly heavier than before"]] },
+  { group: "Poliquin", name: "German Body Composition (GBC)", who: "Fat loss, intermediate", weeks: [["Structure", "Pairs or tri-sets alternating upper and lower body, 10–12 reps, 30–75 s between exercises, 2–4 min after each round"], ["Length", "3–4 weeks before changing exercises"]] },
+  { group: "Poliquin", name: "6-12-25 tri-sets", who: "Hypertrophy, intermediate", weeks: [["Structure", "Three exercises for one muscle: 6 reps heavy, 12 reps, 25 reps, about 10 s between, 3–5 rounds, 3 min rest"], ["Starting Point use", "Applied across the session: A series sets of 6, B series 12, C series 25"]] },
+  { group: "Poliquin", name: "Accumulation / intensification", who: "All levels", weeks: [["Principle", "Alternate volume phases and intensity phases every 2–3 weeks so neither quality detrains"], ["KILO", "Formalised as 3-week mesocycles inside a 12-week macrocycle"]] }
+];
+
+const COACH_NOTES = [
+  ["Charles Poliquin", "Structural balance before chasing big lifts; tempo on every exercise; alternate accumulation and intensification; GVT, GBC and 6-12-25 as hypertrophy and fat-loss tools.", "Structural balance test, tempo in every series, GBC 6-12-25 in block 2."],
+  ["KILO (Cazeault and team)", "A/B/C series, 3-week mesocycles, goal-specific rep schemes and intensities, standard sets for most of a beginner's year. Cazeault: less training stress can help fat loss.", "Session structure, rep-scheme database, step loading, no extra volume for fat loss."],
+  ["Mike Boyle", "Single-leg training leads and bilateral supports. Progress from static supported (split squat) to dynamic (lunges, step-ups) to unsupported (1-leg RDL).", "One-limb foundation and the building-block knee and hamstring sequences."],
+  ["Dan John", "Five movements: push, pull, hinge, squat, loaded carry. Goblet squat as the squat entry point. Everyday fitness = strength training, walking and caloric correctness.", "Goblet squat as the first basic lift, carries in the trunk blocks, steps before cardio."],
+  ["Ian King", "Single-leg work and control drills; stability before load.", "Unilateral A series in the foundation phase."],
+  ["Christian Thibaudeau", "3–4 sessions a week suits most lifters once they're past the beginner stage. Cut calories gradually, carbs furthest from training first.", "Frequency rises after the foundation; fat-loss start protocol."],
+  ["Eric Helms", "Adherence, then calories, then macros. Lose 0.5–1% of body weight a week; protein 2.3–3.1 g/kg lean mass when lean and dieting; diet breaks.", "Nutrition agreement, fat-loss rates, protein on lean mass."],
+  ["Mike Israetel", "Diet phases 6–12 weeks at up to 1% a week, then maintenance. Calorie balance first, food quality second.", "Diet break in the deload week; block-length fat-loss phases."]
+];
+
+function renderLibrary() {
+  const el = $("#view-library");
+  if (el.dataset.ready) { filterSchemes(); return; }
+  el.dataset.ready = "1";
+  const types = Object.keys(SCHEME_TYPES), quals = ["Strength endurance", "Hypertrophy", "Functional hypertrophy", "Relative strength"];
+  const sel = (id, label, opts) => `<label class="unit">${label} <select id="${id}" style="font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px"><option value="">All</option>${opts.map(o => `<option>${esc(o)}</option>`).join("")}</select></label>`;
+  const groups = [...new Set(TEMPLATES.map(t => t.group))];
+  el.innerHTML = `<div class="report" style="padding-top:24px">
+    <div class="card"><div class="eyebrow">Style and purpose</div><h2 style="font-size:32px">The Starting Point method</h2>
+      <p style="margin:0;max-width:72ch"><b>Purpose:</b> make everyday people stronger, leaner and pain-free for the long run, by building structural balance first and growing slowly. Every client is assessed before anything is prescribed, and nutrition is a conversation at every check-in, not a handout.</p>
+      <dl class="proto">
+        <dt>6 months minimum</dt><dd><b>12 weeks, a deload, 12 weeks, reassessed every month</b><span>Nobody starts on less than 6 months. Clients over 50 take longer to get back to normal, so their timeline is planned that way from day one.</span></dd>
+        <dt>Assess first</dt><dd><b>Health history, MAP, structural balance, body composition</b><span>The numbers pick the starting point; feelings don't.</span></dd>
+        <dt>Structural balance</dt><dd><b>One limb at a time, building blocks every session</b><span>Knees, elbows, ankles, hamstrings, posture, lower back, trunk, and hip and knee flexion.</span></dd>
+        <dt>Slow growth</dt><dd><b>Hypertrophy (6+ reps) for at least the first year</b><span>Nothing heavy in year one. Standard sets with constant load first, then step loading.</span></dd>
+        <dt>A bit more strength</dt><dd><b>The A series is always the strength lift</b><span>Logged every session, beaten when every rep is clean, retested at each full reassessment.</span></dd>
+        <dt>Earn frequency</dt><dd><b>2 full-body days for 8+ weeks (12 for 50+)</b><span>Then basic lifts and KILO splits; then GBC 6-12-25 in block 2.</span></dd>
+        <dt>Nutrition talk</dt><dd><b>Client-chosen habits, protein first, loose rules followed 80% of the time</b><span>Start from what they actually eat for breakfast, lunch, supper and snacks.</span></dd>
+        <dt>Recovery sets the pace</dt><dd><b>Sleep, stress, digestion and night waking</b><span>Poor recovery means a slower ramp, not more effort.</span></dd>
+        <dt>Medical respect</dt><dd><b>Refer, don't diagnose</b><span>Medication and lab targets stay with the client's doctor.</span></dd>
+      </dl></div>
+
+    <div class="card"><h3>12-week templates</h3>
+      ${groups.map(g => `<div class="eyebrow" style="padding-top:8px">${esc(g)}</div><div class="rep-grid">${TEMPLATES.filter(t => t.group === g).map(t => `<div class="card" style="background:var(--bg)"><h3 style="font-size:17px">${esc(t.name)}</h3><div class="help" style="margin:0">${esc(t.who)}</div><dl class="proto tight">${t.weeks.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>`).join("")}</div>`).join("")}
+      <div class="eyebrow" style="padding-top:8px">KILO macrocycles by goal and training age (A series, % 1RM)</div>
+      <div class="tbl-wrap"><table class="road"><thead><tr><th>Goal</th><th>Level</th>${MESO.map(m => `<th>${m}</th>`).join("")}</tr></thead><tbody>
+        ${Object.entries(KILO_MACROS).map(([g, lv]) => Object.entries(lv).map(([l, ms], i) => `<tr><td>${i ? "" : esc(g)}</td><td>${l}</td>${ms.map(([pc, sc]) => `<td><span class="mono">${esc(sc)}</span><span class="wk">${pc}%</span></td>`).join("")}</tr>`).join("")).join("")}
+      </tbody></table></div>
+      <p style="margin:0;color:var(--muted);font-size:13px">Beginner 0–1 yr: accumulation → intensification +8–10% intensity, block to block +2–4%. Intermediate 2–3 yrs: +10–12% / +4–6%. Advanced 4+ yrs: +12–15% / +6–8%. Below Advanced, Starting Point stays at 6+ reps regardless.</p></div>
+
+    <div class="card" id="schemeCard"><h3>Rep scheme database · ${REP_SCHEMES.length} schemes</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center">
+        ${sel("fq", "Quality", quals)}${sel("ft", "Type", types)}${sel("fp", "Phase", ["Accumulation", "Intensification"])}
+        <label class="unit"><input type="checkbox" id="fslow"> Allowed below Advanced (6+ reps)</label>
+        <label class="unit">Search <input type="text" id="fs" placeholder="e.g. 5,3,1" style="max-width:140px"></label>
+      </div>
+      <div class="tbl-wrap"><table class="road"><thead><tr><th>% 1RM</th><th>A series</th><th>Volume</th><th>Quality</th><th>Type</th><th>Phase</th><th>Level</th></tr></thead><tbody id="schemeRows"></tbody></table></div>
+      <div id="typeNotes" class="proto" style="display:grid"></div></div>
+
+    <div class="card"><h3>What other coaches add for gen-pop clients</h3><dl class="proto">${COACH_NOTES.map(([n, a, b]) => `<dt>${esc(n)}</dt><dd><b>${esc(a)}</b><span>Used here: ${esc(b)}</span></dd>`).join("")}</dl></div>
+  </div>`;
+  ["fq", "ft", "fp", "fslow", "fs"].forEach(id => $("#" + id).addEventListener("input", filterSchemes));
+  $("#typeNotes").innerHTML = Object.entries(SCHEME_TYPES).map(([k, v]) => `<dt>${esc(k)}</dt><dd><b>${esc(v.phase)} · ${esc(v.level)}</b><span>${esc(v.note)}</span></dd>`).join("");
+  filterSchemes();
+}
+function filterSchemes() {
+  const body = $("#schemeRows"); if (!body) return;
+  const q = $("#fq").value, t = $("#ft").value, ph = $("#fp").value, slow = $("#fslow").checked, srch = $("#fs").value.replace(/\s/g, "");
+  const rows = REP_SCHEMES.filter(r => (!q || r.q === q) && (!t || r.t === t) && (!ph || SCHEME_TYPES[r.t].phase.startsWith(ph) || SCHEME_TYPES[r.t].phase === "Both") && (!slow || okSlow(r)) && (!srch || r.s.replace(/×/g, "x").includes(srch)));
+  body.innerHTML = rows.map(r => `<tr><td class="mono">${r.pct}%</td><td class="mono">${esc(r.s)}</td><td class="mono">${r.vol}${r.perSet ? " / set" : ""}</td><td>${esc(r.q)}</td><td>${esc(r.t)}</td><td>${esc(SCHEME_TYPES[r.t].phase)}</td><td>${esc(SCHEME_TYPES[r.t].level)}</td></tr>`).join("") || '<tr><td colspan="7" style="color:var(--muted)">No schemes match.</td></tr>';
+}
+
 /* ---------- Review step ---------- */
 function reviewHTML() {
   const missing = SECTIONS.map((s, i) => [s, i]).filter(([s, i]) => !complete(i) && s.req.length);
@@ -1582,6 +1817,7 @@ function reviewHTML() {
   return `<div class="sec-head"><div class="plate" style="background:var(--sunk)">✓</div><div><div class="eyebrow">Last step</div><h2>Review & send</h2>
       <p>Check your answers below, then copy or download them and send them to your coach.</p></div></div>
     ${missing.length ? `<div class="flag warn" style="margin:12px 0"><span class="pill">Missing</span><span>Some required answers are still blank in: ${missing.map(([s, i]) => `<a href="#" data-step="${i}">${esc(s.title)}</a>`).join(", ")}.</span></div>` : `<div class="flag ok" style="margin:12px 0"><span class="pill">Done</span><span>All required answers are in. The bar is fully loaded.</span></div>`}
+    ${["Under 3 months", "3–6 months"].includes(data.commit_len) ? `<div class="flag warn" style="margin:0 0 12px"><span class="pill">Note</span><span>Coaching programs run a minimum of ${COACH_RULES.minCommitMonths} months. Your coach will talk you through what that looks like.</span></div>` : ""}
     ${to}
     <div class="utility" style="margin:4px 0 16px"><button class="btn primary" type="button" id="copyAns">Copy my answers</button><button class="btn" type="button" id="dlAns">Download .txt</button>${COACH.email ? '<a class="btn" id="mailAns" href="#">Open in email</a>' : ""}</div>
     <div class="answers">${answersHTML()}</div>
@@ -1619,7 +1855,7 @@ async function downloadText(txt, filename) {
 const EXAMPLE = {
   units: IMPERIAL, name: "Jordan Reyes (example)", email: "jordan@example.com", phone: "", age: "34", sex: "Male", ht_ft: "5", ht_in: "10", wt: "192",
   occupation: "Project manager", job_activity: "Mostly sitting", steps: "4,000–7,000",
-  goal_primary: "Lose body fat", goal_secondary: ["Build muscle", "Get stronger"], goal_specific: "Down to about 178 lb, see abs again, bench 225 for a single.",
+  goal_primary: "Lose body fat", goal_secondary: ["Build muscle", "Get stronger"], goal_6mo: "Down to about 180 lb, back pain gone, training 3x a week without missing.", goal_1yr: "175 lb and lean, bench my body weight, play a full basketball season without getting hurt.", commit_len: "6–12 months",
   goal_why: "Wedding in June and I've drifted the last two years since my second kid.", goal_wt: "178", deadline: "June 14", commit: "8", days: "4", session_len: "60–75 min",
   equipment: "Full commercial gym", style_pref: ["Barbell strength", "Bodybuilding"], dislikes: "Burpees, long steady cardio.",
   parq_heart: "No", parq_chest: "No", parq_dizzy: "No", parq_chronic: "No", parq_meds: "No", parq_bone: "No", parq_super: "No",
@@ -1630,12 +1866,14 @@ const EXAMPLE = {
   train_age: "2–4 years", layoff: "I'm in one now", ta_type: ["Bodybuilding / hypertrophy", "Powerlifting / strength"], coached: "Written programs or apps", technique: ["Squat", "Deadlift / hinge", "Bench press", "Chin-up"], methods: ["Drop sets"], train_now: "3–4 days/week", current_routine: "3 days full body when I can: squat or deadlift, bench, rows, curls. Usually 45 min.",
   sets_now: "6–10", rir: "2–3 reps left", logs: "Sometimes",
   lift_squat_w: "245", lift_squat_r: "5", lift_bench_w: "185", lift_bench_r: "5", lift_dead_w: "295", lift_dead_r: "3", lift_ohp_w: "105", lift_ohp_r: "5", lift_chin_w: "0", lift_chin_r: "6", pullups: "6",
-  cardio: "1–2 times", cardio_type: "Pickup basketball on Sundays", sports: "High school basketball and track.",
+  cardio: "1–2 times", cardio_type: "Pickup basketball on Sundays", sports_now: "Yes, recreationally", sports_now_what: "Pickup basketball, Sundays", sports: "High school basketball and track.",
   prev_best: "Age 29, 4-day upper/lower and tracking macros. Around 175 lb.", prev_worked: "Upper/lower split, tracking food on weekdays.",
   prev_failed: "Running programs; stopped when my knees ached. Lost the routine when the second baby came.",
   grows: ["Quads", "Arms"], lagging: ["Chest", "Back", "Shoulders"], soreness: "1–2 days", joint_ache: "Sometimes",
   tracks_food: "Track daily in an app", cal_avg: "2650", protein_avg: "", track_conf: "Mostly estimates", wt_trend: "Gone up", wt_change: "3",
-  typical_day: "Coffee only until 11. Lunch out (burrito bowl). Snacks at 3pm. Big dinner with family, then snacks after the kids are in bed. Beers on Fri/Sat.",
+  meal_bfast: "Nothing, just 2 coffees with cream until about 11", meal_snack1: "", meal_lunch: "Burrito bowl or a sandwich from the place near work", meal_snack2: "Granola bar and chips around 3 pm", meal_supper: "Pasta or chicken and rice with the family, not many vegetables", meal_evening: "Chips or ice cream after the kids are in bed; beers Fri/Sat",
+  snacker: "Every day", gluten: "Daily", dairy: "Sometimes", wl_past: "Yes, but regained some", wl_amount: "20", wl_how: "Tracked macros and trained 4x a week before the second kid", drugs: "Former", drug_type: ["Cannabis"], drug_when: "2019", alc_binge: "Monthly",
+  wake_clock: ["1–3 am"], wake_why: ["To pee"], wake_back: "After 30+ min",
   meals: "3", pattern: ["Skip breakfast", "Eat late at night", "Overeat on weekends"], diet_style: "No particular diet", water: "1–2 L", alcohol: "4–7", caffeine: "3–4 cups",
   diet_count: "1–2", last_diet: "Over a year ago", wt_low: "172", wt_high: "195", food_rel: ["Eating when stressed"], cook: "Basic", prep_time: "1–3 h",
   sleep_hrs: "6–7 h", sleep_q: "5", bed_wake: "Midnight to 6:30", wake_night: "Once", screens: "Yes", stress: "7", stress_src: ["Work", "Family"], energy: "5",
@@ -1664,6 +1902,7 @@ const EXAMPLE = {
 if (COACH.name) $("#coachLine").textContent = `New client intake · ${COACH.name}`;
 render();
 if (location.hash === "#report") setView("report");
+if (location.hash === "#library") setView("library");
 </script>
 </body>
 </html>

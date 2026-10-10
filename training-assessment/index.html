@@ -66,7 +66,32 @@ button { font: inherit; color: inherit; }
 /* header */
 header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding-block: 28px 18px; border-bottom: 1px solid var(--line); }
 header.top p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
-.tabs { display: flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: var(--r); }
+.tabs { display: flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: var(--r); max-width: 100%; overflow-x: auto; }
+.tabs button { white-space: nowrap; }
+.active-client { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: right; }
+.active-client b { color: var(--ink); }
+:root { --viz-lean: #1f4fa3; --viz-fat: #c8322b; --viz-grid: #dfe3de; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --viz-lean: #5b86d9; --viz-fat: #d9645a; --viz-grid: #2a312e; } }
+:root[data-theme="dark"] { --viz-lean: #5b86d9; --viz-fat: #d9645a; --viz-grid: #2a312e; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.stat .v { font: 700 32px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.stat .d { font: 500 12px var(--f-mono); }
+.stat .d.good { color: var(--ok); } .stat .d.bad { color: var(--crit); } .stat .d.flat { color: var(--muted); }
+.chart { position: relative; width: 100%; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { font: 500 11px var(--f-mono); fill: var(--muted); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); padding: 8px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 3; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 14px; }
+.site-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.site-grid input { max-width: 100%; }
+.client-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.client { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.client.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.client .meta { font-size: 13px; color: var(--muted); }
+select.inp { max-width: 100%; min-width: 0; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
 .tabs button { border: 0; background: transparent; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--muted); }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 
@@ -107,7 +132,7 @@ input[type=text], input[type=email], input[type=tel], input[type=number], textar
 input[type=number] { max-width: 160px; font-family: var(--f-mono); }
 textarea { min-height: 84px; resize: vertical; max-width: 100%; }
 input:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-.unit { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.unit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; max-width: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--bg); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 14px; line-height: 1.3; }
 .chip:hover { border-color: var(--muted); }
@@ -218,6 +243,9 @@ table.road td:first-child { font-weight: 600; white-space: nowrap; }
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-form" aria-selected="true" data-view="form">Client form</button>
       <button role="tab" id="tab-report" aria-selected="false" data-view="report">Coach report</button>
+      <button role="tab" id="tab-measure" aria-selected="false" data-view="measure">Measurements</button>
+      <button role="tab" id="tab-progress" aria-selected="false" data-view="progress">Progress</button>
+      <button role="tab" id="tab-clients" aria-selected="false" data-view="clients">Clients</button>
       <button role="tab" id="tab-library" aria-selected="false" data-view="library">Program library</button>
     </div>
   </header>
@@ -242,6 +270,9 @@ table.road td:first-child { font-weight: 600; white-space: nowrap; }
 
   <section id="view-report" hidden></section>
   <section id="view-library" hidden></section>
+  <section id="view-measure" hidden></section>
+  <section id="view-progress" hidden></section>
+  <section id="view-clients" hidden></section>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -615,6 +646,13 @@ const SECTIONS = [
     ] }
 ];
 
+/* ---------- Client profiles (coach's browser only) ---------- */
+const BOOK_KEY = "starting-point-clients-v1";
+let book = { clients: {}, active: null };
+try { const b = JSON.parse(localStorage.getItem(BOOK_KEY) || "null"); if (b && b.clients) book = b; } catch (e) {}
+function saveBook() { try { localStorage.setItem(BOOK_KEY, JSON.stringify(book)); } catch (e) { toast("This browser can't save profiles. Export a backup."); } }
+function activeClient() { return book.active ? book.clients[book.active] || null : null; }
+
 /* ---------- State ---------- */
 const STORE_KEY = "starting-point-intake-v1";
 let data = { units: IMPERIAL };
@@ -622,7 +660,9 @@ let step = 0;
 let isExample = false;
 try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); if (s && s.data) { data = s.data; step = s.step || 0; isExample = !!s.example; } } catch (e) {}
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ data, step, example: isExample })); $("#saveState").textContent = "Saved in this browser"; }
+  const cl = activeClient();
+  if (cl && !isExample) { cl.intake = data; cl.name = data.name || cl.name; cl.updated = Date.now(); saveBook(); }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ data, step, example: isExample })); $("#saveState").textContent = cl ? `Saved to ${cl.name || "client"}'s profile` : "Saved in this browser"; }
   catch (e) { $("#saveState").textContent = "This browser can't save progress; finish in one sitting"; }
 }
 
@@ -800,7 +840,7 @@ $("#clearBtn").addEventListener("click", () => {
   clearArmed = false; $("#clearBtn").textContent = "Clear all answers";
   data = { units: IMPERIAL }; step = 0; isExample = false; save(); render(); toast("Answers cleared");
 });
-$("#loadExample").addEventListener("click", () => { data = JSON.parse(JSON.stringify(EXAMPLE)); isExample = true; step = 0; save(); render(); toast("Example client loaded"); });
+$("#loadExample").addEventListener("click", () => { book.active = null; saveBook(); data = JSON.parse(JSON.stringify(EXAMPLE)); isExample = true; renderActiveLine(); step = 0; save(); render(); toast("Example client loaded"); });
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
 
@@ -1378,9 +1418,12 @@ function calc(d) {
 
 /* ---------- Coach report ---------- */
 function setView(v) {
-  ["form", "report", "library"].forEach(k => { $("#tab-" + k).setAttribute("aria-selected", v === k); $("#view-" + k).hidden = v !== k; });
+  ["form", "report", "library", "measure", "progress", "clients"].forEach(k => { $("#tab-" + k).setAttribute("aria-selected", v === k); $("#view-" + k).hidden = v !== k; });
   if (v === "report") renderReport();
   if (v === "library") renderLibrary();
+  if (v === "measure") renderMeasure();
+  if (v === "progress") renderProgress();
+  if (v === "clients") renderClients();
   try { history.replaceState(null, "", "#" + v); } catch (e) {}
   window.scrollTo({ top: 0 });
 }
@@ -1697,6 +1740,7 @@ function reportText() {
   if (c.habits.length) { L.push("", "FIRST HABITS"); c.habits.forEach(h => L.push("- " + h)); }
   L.push("", "=".repeat(40), "ALL ANSWERS");
   answerRows().forEach(([t, rows]) => { L.push("", t.toUpperCase()); rows.forEach(([k, v]) => L.push(`${k}: ${v}`)); });
+  L.push("", "--- Starting Point data: coach, paste this whole message into the Clients tab ---", "SPDATA:" + encodeData(data));
   return L.join("\n");
 }
 
@@ -1810,6 +1854,340 @@ function filterSchemes() {
   body.innerHTML = rows.map(r => `<tr><td class="mono">${r.pct}%</td><td class="mono">${esc(r.s)}</td><td class="mono">${r.vol}${r.perSet ? " / set" : ""}</td><td>${esc(r.q)}</td><td>${esc(r.t)}</td><td>${esc(SCHEME_TYPES[r.t].phase)}</td><td>${esc(SCHEME_TYPES[r.t].level)}</td></tr>`).join("") || '<tr><td colspan="7" style="color:var(--muted)">No schemes match.</td></tr>';
 }
 
+
+/* ---------- Measurements, progress and client profiles ---------- */
+const SITES14 = [["chin", "Chin"], ["cheek", "Cheek"], ["pec", "Pec"], ["biceps", "Biceps"], ["triceps", "Triceps"], ["sscap", "Subscapular"], ["austr", "Austr"], ["midax", "Mid-axillary"], ["supra", "Suprailiac"], ["umbil", "Umbilical"], ["knee", "Knee"], ["calves", "Calf"], ["quad", "Quadriceps"], ["hamst", "Hamstring"]];
+// BioSignature's traditional site readings. Practitioner claims, not medically validated.
+const BIOSIG = { chin: "Diet progress (no hormone link claimed)", cheek: "Diet progress (no hormone link claimed)", pec: "Androgens", triceps: "Androgens", sscap: "Insulin sensitivity / carb tolerance", supra: "Insulin sensitivity / carb tolerance", midax: "Thyroid", umbil: "Cortisol / stress", knee: "Growth hormone", calves: "Growth hormone", quad: "Estrogen management", hamst: "Estrogen management" };
+// Weighted 14-site estimate fitted to the coach's existing skinfold software (36 tests, one male client, LOO error ±0.2–0.5%).
+const SP14 = { k: 8.59707, chin: 0.09156, cheek: 0.02028, pec: 0.07885, biceps: 0.00646, triceps: 0.05903, sscap: 0.08681, austr: 0.04814, midax: 0.05605, supra: 0.02704, umbil: 0.07912, knee: 0.00761, calves: 0.07936, quad: 0.18353, hamst: 0.19767 };
+const BF_EQS = {
+  manual: "Entered from my software",
+  sp14: "Starting Point 14-site (matches my software, approx.)",
+  jp7: "Jackson-Pollock 7-site",
+  jp3: "Jackson-Pollock 3-site",
+  dw: "Durnin-Womersley 4-site"
+};
+const siri = D => 495 / D - 450;
+function measureCalc(m, sex) {
+  const v = k => num(m.sites && m.sites[k]);
+  const have = ks => ks.every(k => v(k) != null);
+  const all = SITES14.map(([k]) => k), age = num(m.age) || 35, f = sex === "Female";
+  const sum = have(all) ? Math.round(all.reduce((a, k) => a + v(k), 0) * 10) / 10 : null;
+  const sumOf = ks => ks.reduce((a, k) => a + v(k), 0);
+  let pct = null, method = m.method || (num(m.pct) != null ? "manual" : "sp14");
+  if (method === "manual") pct = num(m.pct);
+  else if (method === "sp14" && have(all)) pct = all.reduce((a, k) => a + SP14[k] * v(k), SP14.k);
+  else if (method === "jp7" && have(["pec", "midax", "triceps", "sscap", "umbil", "supra", "quad"])) { const S = sumOf(["pec", "midax", "triceps", "sscap", "umbil", "supra", "quad"]); pct = siri(f ? 1.097 - 0.00046971 * S + 0.00000056 * S * S - 0.00012828 * age : 1.112 - 0.00043499 * S + 0.00000055 * S * S - 0.00028826 * age); }
+  else if (method === "jp3") { const ks = f ? ["triceps", "supra", "quad"] : ["pec", "umbil", "quad"]; if (have(ks)) { const S = sumOf(ks); pct = siri(f ? 1.0994921 - 0.0009929 * S + 0.0000023 * S * S - 0.0001392 * age : 1.10938 - 0.0008267 * S + 0.0000016 * S * S - 0.0002574 * age); } }
+  else if (method === "dw" && have(["biceps", "triceps", "sscap", "supra"])) {
+    const L = Math.log10(sumOf(["biceps", "triceps", "sscap", "supra"]));
+    const T = f ? [[17, 1.1369, .0598], [20, 1.1549, .0678], [30, 1.1599, .0717], [40, 1.1423, .0632], [50, 1.1333, .0612], [999, 1.1339, .0645]] : [[17, 1.1533, .0643], [20, 1.1620, .0630], [30, 1.1631, .0632], [40, 1.1422, .0544], [50, 1.1620, .0700], [999, 1.1715, .0779]];
+    const [, c, mm] = T.find(r => age < r[0]); pct = siri(c - mm * L);
+  }
+  const wt = num(m.wt);
+  if (pct != null) pct = Math.round(pct * 10) / 10;
+  const fat = pct != null && wt ? wt * pct / 100 : null;
+  return { sum, pct, fat, lean: fat != null ? wt - fat : null, wt, method };
+}
+const clientUnits = () => isImp(data) ? "lb" : "kg";
+const sortMeasures = arr => arr.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.order || 0) - (b.order || 0));
+function measuresOf(cl) { return cl ? sortMeasures(cl.measures || []) : (isExample ? exampleMeasures() : []); }
+const fmtDate = iso => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); };
+function exampleMeasures() {
+  const base = { chin: 9.4, cheek: 10.6, pec: 19, biceps: 6.4, triceps: 11.5, sscap: 19.5, austr: 42, midax: 15.5, supra: 21, umbil: 31, knee: 6.4, calves: 9.4, quad: 23, hamst: 19 };
+  const dates = ["2026-03-02", "2026-03-30", "2026-04-27", "2026-05-25", "2026-06-22", "2026-07-20", "2026-08-17", "2026-09-14"];
+  const scale = [1, .96, .93, .9, .88, .86, .83, .8].map(v => v * 0.66), wts = [192, 190.5, 189, 187.6, 187, 186.2, 184.8, 183.6];
+  return dates.map((dt, i) => ({ id: "ex" + i, date: dt, age: 34, wt: wts[i], method: "sp14", sites: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, Math.round(v * (k === "knee" ? 1 - (1 - scale[i]) / 3 : scale[i]) * 10) / 10])) }));
+}
+function syncLatestToIntake(cl) {
+  const ms = measuresOf(cl); if (!ms.length) return;
+  const last = ms[ms.length - 1], r = measureCalc(last, data.sex);
+  if (r.pct != null) { data.bf_method = "Skinfold: other protocol"; data.bf_pct = String(r.pct); }
+  if (r.wt) data.wt = String(r.wt);
+  if (last.age && !data.age) data.age = String(last.age);
+}
+
+/* encode/decode client answers for copy-paste transfer */
+function encodeData(obj) { try { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); } catch (e) { return ""; } }
+function decodeData(txt) { const m = String(txt).match(/SPDATA:([A-Za-z0-9+/=]+)/); if (!m) return null; try { return JSON.parse(decodeURIComponent(escape(atob(m[1])))); } catch (e) { return null; } }
+const newId = () => "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function renderActiveLine() {
+  const cl = activeClient(); let el = $("#activeLine");
+  if (!el) { el = document.createElement("div"); el.id = "activeLine"; el.className = "active-client"; $(".tabs").after(el); }
+  el.innerHTML = cl ? `Working on <b>${esc(cl.name || "Unnamed client")}</b> · <a href="#clients" data-view="clients">switch</a>` : isExample ? "Working on the example client" : "";
+}
+function openClient(id) {
+  const cl = book.clients[id]; if (!cl) return;
+  book.active = id; saveBook(); isExample = false;
+  data = JSON.parse(JSON.stringify(cl.intake || { units: IMPERIAL, name: cl.name })); step = 0;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ data, step, example: false })); } catch (e) {}
+  render(); renderActiveLine(); toast(`Opened ${cl.name || "client"}`);
+}
+function createClient(intake, measures) {
+  const id = newId();
+  book.clients[id] = { id, name: intake.name || "New client", created: Date.now(), updated: Date.now(), intake, measures: measures || [] };
+  saveBook(); return id;
+}
+
+/* ---------- Clients tab ---------- */
+let delArm = null;
+function renderClients() {
+  const el = $("#view-clients"), list = Object.values(book.clients).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const card = cl => {
+    const ms = sortMeasures(cl.measures || []), first = ms[0], last = ms[ms.length - 1];
+    const r0 = first ? measureCalc(first, cl.intake?.sex) : null, r1 = last ? measureCalc(last, cl.intake?.sex) : null;
+    const d = r0 && r1 && r0.pct != null && r1.pct != null ? r1.pct - r0.pct : null;
+    return `<div class="client ${book.active === cl.id ? "on" : ""}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:16px">${esc(cl.name || "Unnamed")}</b>${book.active === cl.id ? '<span class="tag ok">open</span>' : ""}</div>
+      <div class="meta">${esc([cl.intake?.age && cl.intake.age + " yrs", cl.intake?.goal_primary, cl.intake?.train_age].filter(Boolean).join(" · ") || "No intake answers yet")}</div>
+      <div class="meta">${ms.length} measurement${ms.length === 1 ? "" : "s"}${r1 && r1.pct != null ? ` · latest ${r1.pct}% body fat${d != null && ms.length > 1 ? ` (${d > 0 ? "+" : ""}${d.toFixed(1)} since ${fmtDate(first.date)})` : ""}` : ""}</div>
+      <div class="meta">Updated ${new Date(cl.updated || cl.created).toLocaleDateString()}</div>
+      <div class="utility"><button class="btn primary" type="button" data-open="${cl.id}">Open</button><button class="btn" type="button" data-open-go="${cl.id}" data-go-view="progress">Progress</button><button class="btn ghost danger" type="button" data-del="${cl.id}">${delArm === cl.id ? "Click again to delete" : "Delete"}</button></div></div>`;
+  };
+  el.innerHTML = `<div class="report" style="padding-top:24px">
+    <div class="card"><h3>Client profiles</h3>
+      <p style="margin:0;color:var(--muted);font-size:14px;max-width:72ch">Each profile keeps the intake answers, your MAP, structural balance and body-composition entries, and every skinfold test. Profiles live only in this browser on this device; export a backup regularly.</p>
+      <div class="utility"><button class="btn primary" type="button" id="newClient">New client</button>${filled(data.name) && !activeClient() ? `<button class="btn" type="button" id="saveCurrent">Save "${esc(data.name)}" as a client</button>` : ""}${activeClient() ? '<button class="btn ghost" type="button" id="closeClient">Close current client</button>' : ""}</div>
+      ${list.length ? `<div class="client-list">${list.map(card).join("")}</div>` : '<p class="note" style="margin:0">No clients yet. Create one, or paste a client\'s answers below.</p>'}</div>
+    <div class="card"><h3>Import a client's answers</h3>
+      <p style="margin:0;color:var(--muted);font-size:14px">When a client finishes the form on their own device, "Copy my answers" includes a data block at the end. Paste their whole message here.</p>
+      <textarea id="importBox" placeholder="Paste the client's message (it contains a line starting with SPDATA:)"></textarea>
+      <div class="utility"><button class="btn primary" type="button" id="importAns">Create profile from answers</button></div></div>
+    <div class="card"><h3>Backup</h3>
+      <div class="utility"><button class="btn" type="button" id="exportBook">Download backup (.json)</button><label class="btn" style="cursor:pointer">Restore backup <input type="file" id="restoreBook" accept="application/json,.json" hidden></label></div>
+      <p style="margin:0;color:var(--muted);font-size:13px">Restoring adds clients from the file; existing profiles with the same ID are replaced by the backup copy.</p></div></div>`;
+  el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => { openClient(b.dataset.open); renderClients(); });
+  el.querySelectorAll("[data-open-go]").forEach(b => b.onclick = () => { openClient(b.dataset.openGo); setView(b.dataset.goView); });
+  el.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    const id = b.dataset.del;
+    if (delArm !== id) { delArm = id; renderClients(); setTimeout(() => { if (delArm === id) { delArm = null; if (!$("#view-clients").hidden) renderClients(); } }, 4000); return; }
+    delete book.clients[id]; if (book.active === id) book.active = null; delArm = null; saveBook(); renderActiveLine(); renderClients(); toast("Client deleted");
+  });
+  $("#newClient").onclick = () => { const id = createClient({ units: IMPERIAL }); openClient(id); setView("form"); toast("New client created. Fill in the form or start with measurements."); };
+  if ($("#saveCurrent")) $("#saveCurrent").onclick = () => { const id = createClient(JSON.parse(JSON.stringify(data)), isExample ? exampleMeasures() : []); openClient(id); renderClients(); };
+  if ($("#closeClient")) $("#closeClient").onclick = () => { book.active = null; saveBook(); renderActiveLine(); renderClients(); toast("Client closed. The form is now a blank working copy."); data = { units: IMPERIAL }; step = 0; save(); render(); };
+  $("#importAns").onclick = () => {
+    const obj = decodeData($("#importBox").value);
+    if (!obj) { toast("No SPDATA block found. Paste the client's whole message."); return; }
+    const id = createClient(obj); openClient(id); renderClients(); toast(`Profile created for ${obj.name || "client"}`);
+  };
+  $("#exportBook").onclick = () => downloadText(JSON.stringify(book, null, 1), `starting-point-clients-${new Date().toISOString().slice(0, 10)}.json`);
+  $("#restoreBook").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { try { const b = JSON.parse(rd.result); if (!b.clients) throw 0; Object.assign(book.clients, b.clients); saveBook(); renderClients(); toast(`Restored ${Object.keys(b.clients).length} client(s)`); } catch (err) { toast("That file isn't a Starting Point backup."); } };
+    rd.readAsText(f);
+  };
+}
+
+/* ---------- Measurements tab ---------- */
+let editId = null, mDraft = null;
+function blankDraft() { const ms = measuresOf(activeClient()); const last = ms[ms.length - 1]; return { date: new Date().toISOString().slice(0, 10), age: data.age || (last && last.age) || "", wt: data.wt || "", method: last && last.method === "manual" ? "manual" : "sp14", sites: {} }; }
+function renderMeasure() {
+  const el = $("#view-measure"), cl = activeClient(), u = clientUnits();
+  if (!cl && !isExample) {
+    el.innerHTML = `<div class="panel empty" style="margin-top:20px"><h2>Open a client first</h2><p>Measurements are saved to a client profile. Create or open one in the Clients tab.</p><div class="nav-btns" style="justify-content:center"><button class="btn primary" type="button" data-view="clients">Go to Clients</button></div></div>`;
+    return;
+  }
+  if (!mDraft) mDraft = blankDraft();
+  const ms = measuresOf(cl), sex = data.sex;
+  const res = measureCalc(mDraft, sex);
+  const rows = ms.slice().reverse().map(m => { const r = measureCalc(m, sex); return `<tr><td>${esc(fmtDate(m.date))}</td><td class="mono">${esc(m.age || "")}</td><td class="mono">${fmt(r.wt, 1)}</td>${SITES14.map(([k]) => `<td class="mono">${esc(m.sites?.[k] ?? "")}</td>`).join("")}<td class="mono"><b>${r.sum ?? "–"}</b></td><td class="mono"><b>${r.pct ?? "–"}</b></td><td class="mono">${r.fat != null ? fmt(r.fat, 1) : "–"}</td><td class="mono">${r.lean != null ? fmt(r.lean, 1) : "–"}</td><td>${cl ? `<button class="btn ghost" type="button" data-medit="${m.id}" style="padding:4px 8px">Edit</button>` : ""}</td></tr>`; }).join("");
+  el.innerHTML = `<div class="report" style="padding-top:24px">
+    ${isExample && !cl ? '<div class="example-banner">Example history. Open a real client in the Clients tab to save measurements.</div>' : ""}
+    <div class="card" id="mCard"><h3>${editId ? "Edit measurement" : "New measurement"} · ${esc(data.name || "client")}</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end">
+        <label class="unit">Date <input type="date" id="m-date" value="${esc(mDraft.date)}" style="max-width:170px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px"></label>
+        <label class="unit">Age <input type="number" id="m-age" value="${esc(mDraft.age)}" style="max-width:80px"></label>
+        <label class="unit">Weight <input type="number" step="0.1" id="m-wt" value="${esc(mDraft.wt)}" style="max-width:100px"> ${u}</label>
+        <label class="unit">Body fat from <select class="inp" id="m-method">${Object.entries(BF_EQS).map(([k, v]) => `<option value="${k}" ${mDraft.method === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
+        <label class="unit" ${mDraft.method === "manual" ? "" : "hidden"}>%Fat <input type="number" step="0.1" id="m-pct" value="${esc(mDraft.pct ?? "")}" style="max-width:90px"> %</label>
+      </div>
+      <div class="site-grid">${SITES14.map(([k, n]) => `<label>${n} (mm)<input type="number" step="0.1" inputmode="decimal" data-site="${k}" value="${esc(mDraft.sites[k] ?? "")}"></label>`).join("")}</div>
+      <div class="stats" id="mLive">${liveStats(res, u)}</div>
+      <div class="utility">${cl ? `<button class="btn primary" type="button" id="mSave">${editId ? "Save changes" : "Save measurement"}</button>` : ""}${editId ? '<button class="btn" type="button" id="mCancel">Cancel edit</button><button class="btn ghost danger" type="button" id="mDel">Delete this test</button>' : ""}<button class="btn ghost" type="button" id="mClear">Clear form</button></div>
+      <p class="note" style="margin:0">Technique: right side, same tester, same time of day, before training. Pinch skin and fat (not muscle), caliper 1 cm from the fingers at right angles, read at 2 seconds. Take two readings per site and enter the average; take a third if they differ by more than 1 mm.</p></div>
+
+    <div class="card"><h3>History · ${ms.length} test${ms.length === 1 ? "" : "s"}</h3>
+      ${ms.length ? `<div class="tbl-wrap"><table class="road" style="min-width:1100px;font-size:13px"><thead><tr><th>Date</th><th>Age</th><th>Wt (${u})</th>${SITES14.map(([, n]) => `<th>${n.slice(0, 6)}</th>`).join("")}<th>Sum</th><th>%Fat</th><th>Fat (${u})</th><th>Lean (${u})</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="note" style="margin:0">No tests yet. Enter the first one above, or paste history from your software below.</p>'}
+      <p style="margin:0;color:var(--muted);font-size:13px">Sum = all 14 sites. Fat mass = weight × %fat. Lean mass = weight − fat mass. "Starting Point 14-site" weights each site (legs most) and was fitted to your existing software's results to within about ±0.5%; it is an estimate, so enter your software's %Fat when you have it.</p></div>
+
+    ${cl ? `<div class="card"><h3>Paste history from your software</h3>
+      <p style="margin:0;color:var(--muted);font-size:14px">Copy rows from your skinfold sheet and paste them here, one test per line, in the sheet's column order: date, age, height, weight, the 14 sites (chin to hamstring), then optionally sum, %fat, fat mass and lean mass. Dates as DD/MM/YYYY or YYYY-MM-DD. The %Fat column, when present, is kept as the value from your software.</p>
+      <textarea id="pasteBox" placeholder="31/07/2026  33  69.0  216.0  8.2  9.7  22.0 ..."></textarea>
+      <div class="utility"><button class="btn primary" type="button" id="pasteGo">Import rows</button><span id="pasteMsg"></span></div></div>` : ""}
+  </div>`;
+  const upd = () => { const r = measureCalc(mDraft, sex); $("#mLive").innerHTML = liveStats(r, u); };
+  el.querySelectorAll("[data-site]").forEach(i => i.oninput = () => { mDraft.sites[i.dataset.site] = i.value; upd(); });
+  [["m-date", "date"], ["m-age", "age"], ["m-wt", "wt"], ["m-pct", "pct"]].forEach(([id, k]) => $("#" + id).oninput = e => { mDraft[k] = e.target.value; upd(); });
+  $("#m-method").onchange = e => { mDraft.method = e.target.value; renderMeasure(); };
+  $("#mClear").onclick = () => { editId = null; mDraft = blankDraft(); renderMeasure(); };
+  if ($("#mCancel")) $("#mCancel").onclick = () => { editId = null; mDraft = blankDraft(); renderMeasure(); };
+  let delOk = false;
+  if ($("#mDel")) $("#mDel").onclick = e => { if (!delOk) { delOk = true; e.target.textContent = "Click again to delete"; return; } cl.measures = cl.measures.filter(x => x.id !== editId); editId = null; mDraft = blankDraft(); cl.updated = Date.now(); saveBook(); renderMeasure(); toast("Test deleted"); };
+  if ($("#mSave")) $("#mSave").onclick = () => {
+    if (!mDraft.date) { toast("Add a date first"); return; }
+    const rec = { ...JSON.parse(JSON.stringify(mDraft)), id: editId || newId() };
+    cl.measures = (cl.measures || []).filter(x => x.id !== rec.id).concat(rec);
+    cl.updated = Date.now(); syncLatestToIntake(cl); save(); saveBook();
+    toast(editId ? "Test updated" : "Test saved"); editId = null; mDraft = blankDraft(); renderMeasure();
+  };
+  el.querySelectorAll("[data-medit]").forEach(b => b.onclick = () => { const m = cl.measures.find(x => x.id === b.dataset.medit); editId = m.id; mDraft = JSON.parse(JSON.stringify(m)); mDraft.sites = mDraft.sites || {}; renderMeasure(); window.scrollTo({ top: 0 }); });
+  if ($("#pasteGo")) $("#pasteGo").onclick = () => {
+    const out = parseHistory($("#pasteBox").value);
+    if (!out.rows.length) { $("#pasteMsg").textContent = "No rows recognised. Each line needs a date and at least 17 numbers."; return; }
+    cl.measures = (cl.measures || []).concat(out.rows); cl.updated = Date.now();
+    if (!data.age && out.rows.length) data.age = String(sortMeasures(out.rows).slice(-1)[0].age || "");
+    syncLatestToIntake(cl); save(); saveBook(); renderMeasure();
+    toast(`Imported ${out.rows.length} test(s)${out.skipped ? `, skipped ${out.skipped} line(s)` : ""}`);
+  };
+}
+function liveStats(r, u) {
+  const t = (label, v, sub) => `<div class="stat"><span class="eyebrow">${label}</span><span class="v">${v}</span>${sub ? `<span class="d flat">${sub}</span>` : ""}</div>`;
+  return t("Sum", r.sum != null ? r.sum + "<small style=\"font-size:14px\"> mm</small>" : "–", "14 sites") + t("Body fat", r.pct != null ? r.pct + "%" : "–", BF_EQS[r.method] || "") + t("Fat mass", r.fat != null ? fmt(r.fat, 1) : "–", u) + t("Lean mass", r.lean != null ? fmt(r.lean, 1) : "–", u);
+}
+function parseHistory(txt) {
+  const rows = []; let skipped = 0, order = 0;
+  String(txt).split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const dm = line.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})|(\d{4})-(\d{2})-(\d{2})/);
+    if (!dm) { skipped++; return; }
+    const iso = dm[4] ? `${dm[4]}-${dm[5]}-${dm[6]}` : `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}`;
+    const rest = line.slice(dm.index + dm[0].length);
+    let n;
+    if (rest.includes("\t")) {
+      const cells = rest.split("\t").map(c => c.trim()); if (cells[0] === "") cells.shift();
+      // sheet layout: age, cm, in, kg, lb, 14 sites, sum, %fat, fat kg, fat lb, lean kg, lean lb
+      if (cells.length >= 19) {
+        const g = i => num(cells[i]);
+        const lb = g(4), kg = g(3), wt = isImp(data) ? (lb ?? (kg != null ? kg * 2.20462 : null)) : (kg ?? (lb != null ? lb / 2.20462 : null));
+        const sites = Object.fromEntries(SITES14.map(([k], i) => [k, cells[5 + i]]));
+        const pct = g(20);
+        rows.push({ id: newId(), order: order++, date: iso, age: cells[0], wt: wt != null ? String(Math.round(wt * 10) / 10) : "", sites, method: pct != null ? "manual" : "sp14", pct: pct != null ? String(pct) : "" });
+        return;
+      }
+    }
+    n = (rest.match(/-?\d+(?:\.\d+)?/g) || []);
+    if (n.length < 17) { skipped++; return; }
+    const sites = Object.fromEntries(SITES14.map(([k], i) => [k, n[3 + i]]));
+    const pct = n.length >= 19 ? n[18] : "";
+    rows.push({ id: newId(), order: order++, date: iso, age: n[0], wt: n[2], sites, method: pct ? "manual" : "sp14", pct });
+  });
+  return { rows, skipped };
+}
+
+/* ---------- Progress tab (client-facing) ---------- */
+let showBiosig = false, baseId = null;
+function renderProgress() {
+  const el = $("#view-progress"), cl = activeClient(), u = clientUnits();
+  const ms = measuresOf(cl).map(m => ({ ...m, r: measureCalc(m, data.sex) })).filter(m => m.r.pct != null && m.r.wt);
+  if (!ms.length) {
+    el.innerHTML = `<div class="panel empty" style="margin-top:20px"><h2>No progress to show yet</h2><p>Add at least one skinfold test in Measurements${cl ? "" : " after opening a client"}. Two or more tests turn this into a progress report for the client.</p><div class="nav-btns" style="justify-content:center"><button class="btn primary" type="button" data-view="${cl ? "measure" : "clients"}">${cl ? "Add a measurement" : "Go to Clients"}</button></div></div>`;
+    return;
+  }
+  const last = ms[ms.length - 1], prev = ms.length > 1 ? ms[ms.length - 2] : null;
+  const first = ms.find(m => m.id === baseId && m !== last) || ms[0];
+  const shown = ms.slice(ms.indexOf(first));
+  const delta = (a, b, lowerGood, unit, dp = 1) => { if (a == null || b == null) return ""; const d = b - a; if (Math.abs(d) < 0.05) return '<span class="d flat">no change</span>'; const good = lowerGood ? d < 0 : d > 0; return `<span class="d ${good ? "good" : "bad"}">${d > 0 ? "+" : "−"}${fmt(Math.abs(d), dp)}${unit} since ${fmtDate(first.date)}</span>`; };
+  const tile = (label, v, unit, d) => `<div class="stat"><span class="eyebrow">${label}</span><span class="v">${v}<small style="font-size:14px;font-family:var(--f-mono)"> ${unit}</small></span>${d}</div>`;
+  const best = shown.reduce((a, m) => m.r.pct < a.r.pct ? m : a, ms[0]);
+  const siteRows = SITES14.map(([k, n]) => ({ k, n, a: num(first.sites?.[k]), b: num(last.sites?.[k]) })).filter(x => x.a != null && x.b != null).sort((x, y) => (x.b - x.a) - (y.b - y.a));
+  const maxSite = Math.max(1, ...siteRows.flatMap(x => [x.a, x.b]));
+  const top3 = SITES14.map(([k, n]) => ({ k, n, v: num(last.sites?.[k]) })).filter(x => x.v != null).sort((a, b) => b.v - a.v).slice(0, 3);
+  const c = calc(data), agree = c.agreement.find(r => r[0] === "Non-negotiables");
+  const nextPhase = (() => { const start = data.start_date; if (!start) return { row: null }; const wk = Math.floor((Date.now() - new Date(start + "T00:00:00")) / (7 * 864e5)) + 1; const row = wk >= 1 ? c.roadmap.rows.find(r => { const m = r.weeks.match(/(\d+)(?:–(\d+))?/); return m && wk <= +(m[2] || m[1]); }) : c.roadmap.rows[0]; return { wk: Math.max(1, wk), row }; })();
+  el.innerHTML = `<div class="report" style="padding-top:24px" id="progressRoot">
+    ${isExample && !cl ? '<div class="example-banner">Example client. Open a real client to see their progress.</div>' : ""}
+    <div class="rep-head"><div><div class="eyebrow">Progress report · ${esc(fmtDate(first.date))} to ${esc(fmtDate(last.date))} · ${shown.length} tests</div>
+      <h2 style="font-size:40px">${esc(data.name || "Client")}</h2>
+      ${data.goal_6mo ? `<div style="max-width:70ch;margin-top:4px"><b>Your 6-month goal:</b> ${esc(data.goal_6mo)}</div>` : ""}</div>
+      <div class="utility no-print">${ms.length > 2 ? `<label class="unit">Compare from <select class="inp" id="baseSel">${ms.slice(0, -1).map(m => `<option value="${m.id}" ${m === first ? "selected" : ""}>${esc(fmtDate(m.date))}</option>`).join("")}</select></label>` : ""}<button class="btn" type="button" id="dlProg">Download summary</button></div></div>
+    <div class="stats">
+      ${tile("Body fat", last.r.pct, "%", delta(first.r.pct, last.r.pct, true, " pts"))}
+      ${tile("Fat mass", fmt(last.r.fat, 1), u, delta(first.r.fat, last.r.fat, true, " " + u))}
+      ${tile("Lean mass", fmt(last.r.lean, 1), u, delta(first.r.lean, last.r.lean, false, " " + u))}
+      ${tile("Weight", fmt(last.r.wt, 1), u, delta(first.r.wt, last.r.wt, data.goal_primary !== "Build muscle", " " + u))}
+    </div>
+    ${ms.length > 1 ? `<div class="card"><h3>Your body, split into fat and lean mass</h3>
+      <div class="legend"><span><i style="background:var(--viz-lean)"></i>Lean mass</span><span><i style="background:var(--viz-fat)"></i>Fat mass</span></div>
+      <div class="chart" id="chartComp"></div>
+      <p style="margin:0;color:var(--muted);font-size:13px">The full height of each point is your body weight. The goal: the red band gets thinner while the blue band holds or grows.</p></div>
+    <div class="card"><h3>Body fat %</h3><div class="chart" id="chartPct"></div>
+      <p style="margin:0;color:var(--muted);font-size:13px">Best so far: ${best.r.pct}% on ${esc(fmtDate(best.date))}.${prev ? ` Since the last test (${esc(fmtDate(prev.date))}): ${last.r.pct - prev.r.pct > 0 ? "+" : ""}${(last.r.pct - prev.r.pct).toFixed(1)} points.` : ""}</p></div>` : ""}
+    ${ms.length > 1 && siteRows.length ? `<div class="card"><h3>Where it's changed · first test vs latest (mm)</h3>
+      <div class="legend"><span><i style="background:var(--muted)"></i>${esc(fmtDate(first.date))}</span><span><i style="background:var(--viz-lean)"></i>${esc(fmtDate(last.date))}</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">${siteRows.map(x => { const d = x.b - x.a; const pa = x.a / maxSite * 100, pb = x.b / maxSite * 100; return `<div style="display:grid;grid-template-columns:110px minmax(0,1fr) 70px;gap:10px;align-items:center;font-size:13px" title="${esc(x.n)}: ${x.a} → ${x.b} mm"><span>${esc(x.n)}</span><div style="position:relative;height:14px"><div style="position:absolute;top:6px;height:2px;left:${Math.min(pa, pb)}%;width:${Math.abs(pa - pb)}%;background:var(--line)"></div><span style="position:absolute;top:2px;left:calc(${pa}% - 5px);width:10px;height:10px;border-radius:50%;background:var(--muted)"></span><span style="position:absolute;top:1px;left:calc(${pb}% - 6px);width:12px;height:12px;border-radius:50%;background:var(--viz-lean);box-shadow:0 0 0 2px var(--surface)"></span></div><span class="mono" style="color:${d < 0 ? "var(--ok)" : d > 0 ? "var(--crit)" : "var(--muted)"}">${d > 0 ? "+" : d < 0 ? "−" : ""}${fmt(Math.abs(d), 1)}</span></div>`; }).join("")}</div></div>` : ""}
+    <div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px"><h3>Your top 3 sites right now</h3><label class="unit no-print"><input type="checkbox" id="bioToggle" ${showBiosig ? "checked" : ""}> Show BioSignature reading</label></div>
+      <dl class="proto">${top3.map(x => `<dt>${esc(x.n)}</dt><dd><b>${x.v} mm</b>${showBiosig && BIOSIG[x.k] ? `<span>BioSignature reading: ${esc(BIOSIG[x.k])}</span>` : ""}</dd>`).join("")}</dl>
+      ${showBiosig ? '<p style="margin:0;color:var(--muted);font-size:13px">BioSignature links each site to a hormone. That idea comes from Poliquin\'s practice and hasn\'t been confirmed by independent research, so use it as a coaching conversation, not a diagnosis.</p>' : ""}</div>
+    <div class="card"><h3>What happens next</h3><dl class="proto">
+      ${nextPhase.row ? `<dt>Now · week ${nextPhase.wk}</dt><dd><b>${esc(nextPhase.row.label)} (${esc(nextPhase.row.weeks)})</b><span>${esc(nextPhase.row.train)}</span></dd><dt>Nutrition</dt><dd><b>${esc(nextPhase.row.nutr)}</b></dd><dt>Next check</dt><dd><b>${esc(nextPhase.row.test)}</b></dd>` : ""}
+      ${!nextPhase.row ? `<dt>Program</dt><dd><span>${data.start_date ? "The 6-month program has finished; time for the renewal review." : "Set a start date in the coach report's roadmap to show the current phase here."}</span></dd>` : ""}
+      ${agree ? `<dt>Your 2 habits</dt><dd><b>${esc(agree[1])}</b></dd>` : ""}
+      ${data.goal_1yr ? `<dt>1-year goal</dt><dd><b>${esc(data.goal_1yr)}</b></dd>` : ""}
+    </dl></div></div>`;
+  if (ms.length > 1) { drawComp($("#chartComp"), shown, u); drawPct($("#chartPct"), shown); }
+  if ($("#baseSel")) $("#baseSel").onchange = e => { baseId = e.target.value; renderProgress(); };
+  $("#bioToggle").onchange = e => { showBiosig = e.target.checked; renderProgress(); };
+  $("#dlProg").onclick = () => {
+    const L = [`PROGRESS · ${data.name || "Client"}`, `${fmtDate(first.date)} → ${fmtDate(last.date)} (${ms.length} tests)`, "",
+      `Body fat: ${first.r.pct}% → ${last.r.pct}%`, `Fat mass: ${fmt(first.r.fat, 1)} → ${fmt(last.r.fat, 1)} ${u}`, `Lean mass: ${fmt(first.r.lean, 1)} → ${fmt(last.r.lean, 1)} ${u}`, `Weight: ${fmt(first.r.wt, 1)} → ${fmt(last.r.wt, 1)} ${u}`, "", "Site changes (mm):", ...siteRows.map(x => `- ${x.n}: ${x.a} → ${x.b}`)];
+    downloadText(L.join("\n"), `${(data.name || "client").replace(/\W+/g, "-").toLowerCase()}-progress.txt`);
+  };
+}
+function chartFrame(el, ms, yMin, yMax, draw, tipFn) {
+  const W = 720, H = 260, pl = 44, pr = 64, pt = 12, pb = 28;
+  const t0 = new Date(ms[0].date).getTime(), t1 = new Date(ms[ms.length - 1].date).getTime() || t0 + 1;
+  const x = d => pl + ((new Date(d).getTime() - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
+  const y = v => pt + (1 - (v - yMin) / (yMax - yMin)) * (H - pt - pb);
+  const ticks = []; const step = niceStep((yMax - yMin) / 4); for (let v = Math.ceil(yMin / step) * step; v <= yMax + 1e-9; v += step) ticks.push(v);
+  const yrs = [...new Set(ms.map(m => m.date.slice(0, 4)))];
+  const xt = ms.length <= 8 ? ms.map(m => [x(m.date), new Date(m.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: yrs.length > 1 ? "2-digit" : undefined })]) : yrs.map(yv => [x(yv + "-01-01") < pl ? pl : x(yv + "-01-01"), yv]);
+  const xtF = []; xt.forEach(t => { if (!xtF.length || t[0] - xtF[xtF.length - 1][0] >= 48) xtF.push(t); });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img">
+    ${ticks.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--viz-grid)" stroke-width="1"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${fmt(v, step < 1 ? 1 : 0)}</text>`).join("")}
+    ${xtF.map(([xx, l]) => `<text x="${xx}" y="${H - 8}" text-anchor="middle">${esc(l)}</text>`).join("")}
+    ${draw(x, y)}
+    <line class="xh" x1="0" x2="0" y1="${pt}" y2="${H - pb}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+    <rect x="${pl}" y="${pt}" width="${W - pl - pr}" height="${H - pt - pb}" fill="transparent" class="hit"/></svg><div class="tip" hidden></div>`;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), xh = el.querySelector(".xh");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    let bi = 0, bd = 1e9; ms.forEach((m, i) => { const dd = Math.abs(x(m.date) - px); if (dd < bd) { bd = dd; bi = i; } });
+    const m = ms[bi], xx = x(m.date);
+    xh.setAttribute("x1", xx); xh.setAttribute("x2", xx); xh.setAttribute("visibility", "visible");
+    tip.hidden = false; tip.innerHTML = tipFn(m); tip.style.left = (xx / W * 100) + "%"; tip.style.top = (pt / H * r.height + 24) + "px";
+  };
+  svg.querySelector(".hit").addEventListener("mousemove", move);
+  svg.querySelector(".hit").addEventListener("mouseleave", () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); });
+  svg.querySelector(".hit").addEventListener("touchstart", e => move(e.touches[0]), { passive: true });
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+function drawComp(el, ms, u) {
+  const maxW = Math.max(...ms.map(m => m.r.wt)), yMax = Math.ceil(maxW / 20) * 20 + 10;
+  chartFrame(el, ms, 0, yMax, (x, y) => {
+    const lean = ms.map(m => `${x(m.date)},${y(m.r.lean)}`).join(" "), top = ms.map(m => `${x(m.date)},${y(m.r.wt)}`).join(" ");
+    const base = `${x(ms[ms.length - 1].date)},${y(0)} ${x(ms[0].date)},${y(0)}`;
+    const leanRev = ms.slice().reverse().map(m => `${x(m.date)},${y(m.r.lean) - 1}`).join(" ");
+    const last = ms[ms.length - 1], lx = x(last.date);
+    return `<polygon points="${lean} ${base}" fill="var(--viz-lean)" opacity=".85"/>
+      <polygon points="${top} ${leanRev}" fill="var(--viz-fat)" opacity=".85"/>
+      <polyline points="${top}" fill="none" stroke="var(--ink)" stroke-width="2"/>
+      <text x="${lx + 8}" y="${y(last.r.wt) + 4}" style="fill:var(--ink)">${fmt(last.r.wt, 1)} ${u}</text>`;
+  }, m => `<b>${esc(fmtDate(m.date))}</b><br>Weight ${fmt(m.r.wt, 1)} ${u}<br>Fat ${fmt(m.r.fat, 1)} ${u} (${m.r.pct}%)<br>Lean ${fmt(m.r.lean, 1)} ${u}`);
+}
+function drawPct(el, ms) {
+  const vals = ms.map(m => m.r.pct), lo = Math.floor(Math.min(...vals) - 2), hi = Math.ceil(Math.max(...vals) + 2);
+  chartFrame(el, ms, lo, hi, (x, y) => {
+    const pts = ms.map(m => `${x(m.date)},${y(m.r.pct)}`).join(" "), last = ms[ms.length - 1];
+    return `<polyline points="${pts}" fill="none" stroke="var(--viz-fat)" stroke-width="2" stroke-linejoin="round"/>
+      ${ms.map(m => `<circle cx="${x(m.date)}" cy="${y(m.r.pct)}" r="4" fill="var(--viz-fat)" stroke="var(--surface)" stroke-width="2"/>`).join("")}
+      <text x="${x(last.date) + 10}" y="${y(last.r.pct) + 4}" style="fill:var(--ink)">${last.r.pct}%</text>`;
+  }, m => `<b>${esc(fmtDate(m.date))}</b><br>${m.r.pct}% body fat`);
+}
+
 /* ---------- Review step ---------- */
 function reviewHTML() {
   const missing = SECTIONS.map((s, i) => [s, i]).filter(([s, i]) => !complete(i) && s.req.length);
@@ -1902,7 +2280,8 @@ const EXAMPLE = {
 if (COACH.name) $("#coachLine").textContent = `New client intake · ${COACH.name}`;
 render();
 if (location.hash === "#report") setView("report");
-if (location.hash === "#library") setView("library");
+if (["#library", "#measure", "#progress", "#clients"].includes(location.hash)) setView(location.hash.slice(1));
+renderActiveLine();
 </script>
 </body>
 </html>

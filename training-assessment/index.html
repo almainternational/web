@@ -50,6 +50,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); padding-inline: 16px; padding-block: 0 48px; }
 .wrap { max-width: 1120px; margin: 0 auto; }
@@ -415,7 +416,15 @@ const SECTIONS = [
       { id: "cleared", label: "Has a doctor cleared you for exercise?", type: "chips", options: ["Yes, in writing", "Yes, verbally", "Not yet"], show: d => PARQ.some(k => d[k] === "Yes") },
       { id: "conditions", label: "Diagnosed conditions", type: "multi", options: ["Type 1 diabetes", "Type 2 diabetes / prediabetes", "Thyroid condition", "Asthma", "High cholesterol", "PCOS", "Autoimmune condition", "Osteoporosis / osteopenia", "Anxiety / depression", "Digestive condition (IBS, IBD, celiac)", "None"] },
       { id: "conditions_note", label: "Details or other conditions", type: "textarea" },
+      { id: "meds_list", label: "Do you take any of these?", type: "multi", options: ["Statin (cholesterol)", "Other cholesterol medication", "Blood pressure medication", "Metformin or other diabetes pill", "Insulin", "GLP-1 (Ozempic, Wegovy, Mounjaro, Zepbound)", "Thyroid medication", "Antidepressant or anti-anxiety", "Blood thinner", "Birth control or HRT", "None"] },
+      { id: "statin_name", label: "Which statin?", type: "chips", options: ["Atorvastatin (Lipitor)", "Rosuvastatin (Crestor)", "Simvastatin (Zocor)", "Pravastatin", "Lovastatin", "Other / not sure"], show: d => (d.meds_list || []).includes("Statin (cholesterol)") },
+      { id: "statin_muscle", label: "Since starting it, any muscle aches, cramps or weakness?", type: "chips", options: ["No", "Mild", "Yes, it bothers me"], show: d => (d.meds_list || []).includes("Statin (cholesterol)") },
       { id: "meds", label: "Medications and doses", type: "textarea" },
+      { id: "lipid_units", label: "Latest cholesterol results, if you have them", help: "From your last blood test. Leave blank if you don't know.", type: "chips", options: ["mmol/L", "mg/dL"] },
+      { group: [
+        { id: "ldl", label: "LDL", type: "number", unit: d => d.lipid_units || "mmol/L" },
+        { id: "hdl", label: "HDL", type: "number", unit: d => d.lipid_units || "mmol/L" },
+        { id: "tg", label: "Triglycerides", type: "number", unit: d => d.lipid_units || "mmol/L" } ] },
       { id: "supps", label: "Supplements you take now", type: "textarea" },
       { id: "pregnant", label: "Pregnancy", type: "chips", options: ["Not applicable", "Currently pregnant", "Postpartum (under 12 months)", "Trying to conceive"], show: d => d.sex === "Female" },
       { id: "cycle", label: "Menstrual cycle", type: "chips", options: ["Regular", "Irregular", "Hormonal contraception", "Peri / post-menopause", "Prefer not to say"], show: d => d.sex === "Female" },
@@ -554,6 +563,8 @@ const SECTIONS = [
   { id: "habits", title: "Habits & coaching", intro: "What you already do well, what got in the way before, and how you'd like to work together.",
     req: ["consent"],
     fields: [
+      { id: "habit_pick", label: "Pick the 2 food changes you feel most confident you could do every day, starting next week", type: "multi", options: ["Protein at every meal", "Vegetables at 2 meals a day", "Eat breakfast", "Stop eating 2–3 h before bed", "2–3 L of water a day", "Pre-plan weekend meals", "Swap one drink a day for water", "Cook dinner at home 4+ nights", "Weigh myself every morning"] },
+      { id: "habit_conf", label: "How confident are you that you can stick to those 2 changes?", type: "scale", min: 1, max: 10, lo: "Not at all", hi: "Certain" },
       { id: "habits_now", label: "Already doing consistently", type: "multi", options: ["Training 3+ times a week", "7+ hours of sleep", "Protein at most meals", "8,000+ steps", "Vegetables daily", "Limiting alcohol", "Meal prep", "None yet"] },
       { id: "habits_past", label: "Habits you built before that stuck. What made them stick?", type: "textarea" },
       { id: "habits_lost", label: "Habits you've lost since then", type: "textarea" },
@@ -722,7 +733,9 @@ document.addEventListener("click", e => {
       data[id] = data[id] === v ? "" : v;
       chip.parentElement.querySelectorAll("[data-chip]").forEach(c => c.setAttribute("aria-pressed", c.dataset.v === data[id]));
     }
-    changed(); return;
+    changed();
+    if (chip.closest("[data-rerender]")) { const y = window.scrollY; renderReport(); window.scrollTo(0, y); }
+    return;
   }
   const st = e.target.closest("[data-step]");
   if (st) { step = +st.dataset.step; save(); render(); window.scrollTo({ top: 0 }); return; }
@@ -737,6 +750,9 @@ document.addEventListener("input", e => {
   if (el.dataset.f === "start_date") { const y = window.scrollY; renderReport(); window.scrollTo(0, y); }
 });
 $("#panel").addEventListener("submit", e => e.preventDefault());
+document.addEventListener("change", e => {
+  if (e.target.closest("[data-rerender]")) setTimeout(() => { if (!$("#view-report").hidden) { const y = window.scrollY; renderReport(); window.scrollTo(0, y); } }, 0);
+});
 function changed(fromTyping) {
   if (isExample) { isExample = false; }
   save(); updateVisibility(); updateE1rm(); renderBar(); updateSB(); updateMAP();
@@ -809,6 +825,109 @@ function mapResults(d) {
   });
   const regressed = rows.filter(r => r.level && r.level <= 2);
   return { rows, issues, regressed, scored: rows.length };
+}
+
+// Body composition: entered % or Jackson-Pollock 3-site skinfolds (Siri equation)
+const BF_METHODS = ["Skinfold: Jackson-Pollock 3-site", "Skinfold: other protocol", "InBody / BIA", "DEXA", "Bod Pod", "Visual estimate"];
+function bodyComp(d, kg, cm, age) {
+  const female = d.sex === "Female";
+  let bf = num(d.bf_pct), sum = null;
+  if (d.bf_method === BF_METHODS[0]) {
+    const sites = female ? [d.bf_tri, d.bf_supra, d.bf_thigh] : [d.bf_chest, d.bf_abd, d.bf_thigh];
+    if (sites.every(v => num(v) != null) && age) {
+      sum = sites.reduce((a, v) => a + num(v), 0);
+      const bd = female ? 1.0994921 - 0.0009929 * sum + 0.0000023 * sum * sum - 0.0001392 * age : 1.10938 - 0.0008267 * sum + 0.0000016 * sum * sum - 0.0002574 * age;
+      bf = Math.round((495 / bd - 450) * 10) / 10;
+    }
+  }
+  if (bf == null || bf <= 0 || bf >= 70) return { bf: null, sum };
+  const cuts = female ? [14, 21, 25, 32] : [6, 14, 18, 25];
+  const NAMES = ["Essential / very lean", "Athletic", "Fitness", "Average", "Above average (obese range)"];
+  const catIdx = bf < cuts[0] ? 0 : bf < cuts[1] ? 1 : bf < cuts[2] ? 2 : bf < cuts[3] ? 3 : 4;
+  const tgtDefault = female ? (bf >= 32 ? 28 : bf >= 25 ? 23 : Math.max(18, bf - 3)) : (bf >= 25 ? 20 : bf >= 18 ? 15 : Math.max(10, bf - 3));
+  const target = num(d.bf_target) ?? tgtDefault;
+  const fatKg = kg ? kg * bf / 100 : null, lean = kg ? kg - fatKg : null;
+  const goalKg = lean && target < bf ? lean / (1 - target / 100) : null;
+  const waistCm = num(d.waist) != null ? (isImp(d) ? num(d.waist) * 2.54 : num(d.waist)) : null;
+  return { bf, sum, cat: NAMES[catIdx], catIdx, target, targetIsDefault: num(d.bf_target) == null, fatKg, lean, goalKg, whtr: waistCm && cm ? waistCm / cm : null };
+}
+
+// Lipids: thresholds in mmol/L (mg/dL converted)
+function lipidStatus(d) {
+  const mg = d.lipid_units === "mg/dL";
+  const conv = (v, f) => v == null ? null : mg ? v / f : v;
+  const ldl = conv(num(d.ldl), 38.67), hdl = conv(num(d.hdl), 38.67), tg = conv(num(d.tg), 88.57);
+  const flags = [], notes = [];
+  if (ldl != null) { if (ldl >= 5) flags.push(["crit", `LDL ${d.ldl} ${d.lipid_units || "mmol/L"} is very high. Make sure their doctor is managing it.`]); else if (ldl >= 3.5) notes.push(`LDL ${d.ldl} is above the usual target`); }
+  if (hdl != null && hdl < (d.sex === "Female" ? 1.3 : 1.0)) notes.push(`HDL ${d.hdl} is low`);
+  if (tg != null) { if (tg >= 5.6) flags.push(["crit", `Triglycerides ${d.tg} are very high. Doctor follow-up needed.`]); else if (tg >= 1.7) notes.push(`triglycerides ${d.tg} are high`); }
+  if (notes.length) flags.push(["warn", "Blood lipids: " + notes.join(", ") + ". Cholesterol nutrition protocol applies."]);
+  const meds = d.meds_list || [];
+  const concern = (d.conditions || []).includes("High cholesterol") || meds.includes("Statin (cholesterol)") || meds.includes("Other cholesterol medication") || (ldl != null && ldl >= 3.5) || (tg != null && tg >= 1.7) || (hdl != null && hdl < (d.sex === "Female" ? 1.3 : 1.0));
+  return { ldl, hdl, tg, concern, highTg: tg != null && tg >= 1.7, flags };
+}
+
+function medicalProtocol(d, c) {
+  const out = [], meds = d.meds_list || [];
+  if (meds.includes("Statin (cholesterol)")) {
+    const grape = /Atorvastatin|Simvastatin|Lovastatin/.test(d.statin_name || "");
+    out.push(["Statin: training", "Train normally, progress slowly", "Exercise and statins work well together. The slow start (2 sessions a week, 6–15 reps) suits statin users; avoid big jumps in volume or long eccentric work in the first month."]);
+    out.push(["Statin: warning signs", "Stop and see the doctor for new muscle pain, weakness or dark urine", "Normal soreness fades in 2–3 days and matches the work done. Pain that's out of proportion, lasts, or comes with weakness or dark urine is a medical issue, not soreness."]);
+    out.push(["Statin: food and supplements", grape ? "Avoid grapefruit and grapefruit juice (or ask the pharmacist)" : "No grapefruit restriction for most statins of this type (confirm with the pharmacist)", "No red yeast rice (it contains the same compound as lovastatin) and no niacin without the doctor. CoQ10 is safe but the evidence is mixed; the doctor's call."]);
+  }
+  if (meds.includes("GLP-1 (Ozempic, Wegovy, Mounjaro, Zepbound)")) out.push(["GLP-1", "Protein first and resistance training every week", "These drugs cut appetite hard, so lean mass is at risk. Small protein-first meals, shakes if needed, fibre and water for the stomach side effects. The calorie target matters less than hitting protein."]);
+  if (meds.includes("Metformin or other diabetes pill") || meds.includes("Insulin")) out.push(["Blood sugar", "Carbs around training; watch for lows", "Keep training times and meals consistent. Ask the doctor before cutting carbs hard, especially on insulin" + (meds.includes("Metformin or other diabetes pill") ? ". Long-term metformin can lower B12; worth checking at the next blood test." : ".")]);
+  if (meds.includes("Blood pressure medication")) out.push(["Blood pressure", "Use effort (RPE), not heart rate, to judge intensity", "Some BP drugs (beta blockers) cap heart rate. Breathe through every rep, no breath-holding on heavy sets, and stand up slowly after floor work."]);
+  if (meds.includes("Thyroid medication")) out.push(["Thyroid", "Same time every day, on an empty stomach", "Keep coffee, calcium and iron supplements away from the dose as the pharmacist advises. Don't change anything without the doctor."]);
+  if (meds.includes("Blood thinner")) out.push(["Blood thinner", "No new supplements without the doctor", "Includes fish oil, vitamin E, turmeric and high-dose garlic. Bruising easily is common; report anything unusual."]);
+  if (meds.includes("Antidepressant or anti-anxiety")) out.push(["Mood medication", "Expect appetite or weight changes; judge progress on trends", "Don't add St John's wort, 5-HTP or similar supplements without the doctor."]);
+  if (c.lip.concern) {
+    const L = [];
+    L.push(["Cholesterol: weight", "Losing 5–10% of body weight is the first lever", "It improves LDL, triglycerides and HDL together."]);
+    L.push(["Cholesterol: fibre", "10 g+ soluble fibre a day", "Oats or oat bran, barley, beans and lentils, psyllium (1 tbsp in water once or twice a day)."]);
+    L.push(["Cholesterol: fats", `Saturated fat under ~${c.macros ? c.macros.satMax + " g" : "10% of calories"} a day`, "Swap fatty red and processed meat, butter, cream and coconut oil for olive oil, nuts, avocado and fish. Eggs are fine in moderation. Choose fish, eggs and poultry for the meat-and-nuts breakfast instead of red meat daily."]);
+    L.push(["Cholesterol: foods that help", "A handful of nuts daily, fatty fish twice a week, soy foods", "Plant sterols (about 2 g a day from fortified foods) add another LDL drop; check with the doctor if on medication."]);
+    if (c.lip.highTg) L.push(["Triglycerides", "Cut alcohol and sugary drinks first", "Triglycerides respond quickly to less alcohol, fewer refined carbs and more omega-3 fish."]);
+    L.push(["Cholesterol: medication", "Never adjust or stop medication; that's the doctor's call", "Ask the client to share repeat blood work so you can track the effect of training and weight loss."]);
+    out.push(...L);
+  }
+  return out;
+}
+
+// Early fat-loss protocol (first block)
+function fatLossStart(d, c) {
+  const g = d.goal_primary || "";
+  if (!/Lose body fat|Recomp/.test(g) || !c.tdee) return null;
+  const u = wu(d), rate = c.rateKg ? Math.abs(c.fromKg(c.rateKg)).toFixed(2) : null;
+  const lean = c.comp.catIdx != null && c.comp.catIdx <= 2;
+  const rows = [];
+  rows.push(["Wk 1–2 · baseline", "No calorie cut yet", `Daily morning weigh-in (judge the weekly average), waist and photos. ${c.lowEater ? "Eat regular meals and start the protein ramp-up." : "Start the 2 chosen habits."} This finds real maintenance before anything changes.`]);
+  rows.push(["Wk 3 · first cut", c.lowEater ? "Still no cut: build the eating habit first" : `Drop about ${fmt(r50(Math.max(250, c.tdee - c.target)))} kcal a day`, "Take it from carbs furthest from training and from added fats; protein never drops. Untracked clients: one less cupped hand of carbs at 2 meals."]);
+  rows.push(["Every 2 weeks · adjust", rate ? `Target about ${rate} ${u} a week` : "Adjust by the trend", `Losing slower than target for 2 weeks: cut another 100–150 kcal or add 1,000–2,000 daily steps. Losing faster than 1% of body weight a week: add 100–150 kcal back.`]);
+  rows.push(["Activity", "Steps before cardio", "Raise daily steps first. Don't add training volume for fat loss; strength training is there to keep muscle."]);
+  if (lean) rows.push(["Refeed (lean clients)", "One higher-carb day a week at maintenance", "Extra carbs from rice, potatoes and fruit; fat kept low. Helps training quality and diet fatigue."]);
+  rows.push(["Wk 12–13 · diet break", "Maintenance calories during the deload week", "Diet phases run 8–12 weeks, then a maintenance break. Fat loss resumes in block 2 if needed."]);
+  if (c.comp.goalKg) rows.push(["Goal", `${c.comp.target}% body fat ≈ ${fmt(c.fromKg(c.comp.goalKg))} ${u}`, `Keeping current lean mass. At ${rate || "the target"} ${u}/wk that's roughly ${Math.round((num(d.wt) - c.fromKg(c.comp.goalKg)) / (rate || 1))} weeks of dieting, with breaks between phases.`]);
+  return rows;
+}
+
+// Nutrition agreement: loose rules the client signs off on
+function nutritionAgreement(d, c) {
+  const picks = (d.habit_pick || []).slice(0, 2);
+  const auto = [];
+  if (!picks.includes("Protein at every meal")) auto.push("Protein at every meal");
+  if (["0–1", "2–3"].includes(d.veg)) auto.push("Vegetables at 2 meals a day");
+  if ((d.pattern || []).includes("Eat late at night")) auto.push("Stop eating 2–3 h before bed");
+  const rules = (picks.length ? picks : auto.slice(0, 2));
+  const conf = num(d.habit_conf);
+  const mealsWk = ({ "1–2": 2, "3": 3, "4": 4, "5+": 5 }[d.meals] || 3) * 7;
+  const rows = [];
+  rows.push(["Non-negotiables", rules.join(" · ") || "Protein at every meal", picks.length ? "Chosen by the client. Ownership drives adherence." : "Suggested from their answers; let them confirm or swap at the consult."]);
+  if (conf != null && conf < 7) rows.push(["Confidence check", `Confidence ${conf}/10: make the habits smaller`, "Below 7/10, shrink the change (e.g. protein at 1 meal instead of every meal) until they're at 9/10 sure."]);
+  rows.push(["Flexible", `About ${Math.round(mealsWk * 0.2)} of ${mealsWk} meals a week are free (80/20)`, "No banned foods. Free meals are planned, not cheats, and the next meal goes back to normal."]);
+  rows.push(["Level up", "Hit 80% of days for 2 weeks in a row, then add one habit", `Level 1: 2 habits · Level 2: protein target and portions · Level 3: ${d.nut_pref === "Track calories & macros" ? "full macro tracking (their choice)" : "loose calorie range, only if they want it"}.`]);
+  rows.push(["Weekly check-in", "Compliance %, weekly average weight, waist, energy, hunger", "Judge the plan on the trend and on compliance. Change the plan only when compliance is 80%+ and the trend stalls."]);
+  return rows;
 }
 
 // Protein ramp-up for clients who eat little: from today's intake to target in ~20 g steps every 2 weeks
@@ -977,7 +1096,10 @@ function calc(d) {
   const age = num(d.age);
   const bmi = kg && cm ? kg / ((cm / 100) ** 2) : null;
   const sexAdj = d.sex === "Male" ? 5 : d.sex === "Female" ? -161 : -78;
-  const bmr = kg && cm && age ? 10 * kg + 6.25 * cm - 5 * age + sexAdj : null;
+  const comp = bodyComp(d, kg, cm, age);
+  const lbm = comp.bf != null && kg ? kg * (1 - comp.bf / 100) : null;
+  const bmr = lbm ? 370 + 21.6 * lbm : (kg && cm && age ? 10 * kg + 6.25 * cm - 5 * age + sexAdj : null);
+  const bmrMethod = lbm ? "Katch-McArdle (lean mass)" : "Mifflin-St Jeor";
   const stepM = { "Under 4,000": 1.25, "4,000–7,000": 1.35, "7,000–10,000": 1.45, "10,000–13,000": 1.55, "Over 13,000": 1.65 }[d.steps] ?? 1.35;
   const jobA = { "Mostly sitting": 0, "Mixed sitting and standing": 0.05, "On my feet most of the day": 0.1, "Heavy physical work": 0.2 }[d.job_activity] || 0;
   const trA = { "1–2 days/week": 0.05, "3–4 days/week": 0.1, "5+ days/week": 0.15 }[d.train_now] || 0;
@@ -1058,7 +1180,8 @@ function calc(d) {
   let ratePct = 0, phase = "Maintenance";
   const dietWeeks = num(d.diet_weeks);
   const dietFatigue = d.last_diet === "I'm dieting now" && dietWeeks != null && dietWeeks >= 12;
-  if (g === "Lose body fat") { ratePct = bmi && bmi >= 30 ? -0.75 : -0.5; phase = "Fat loss"; }
+  if (g === "Lose body fat") { ratePct = comp.cat ? [-0.4, -0.4, -0.5, -0.6, -0.75][comp.catIdx] : (bmi && bmi >= 30 ? -0.75 : -0.5); phase = "Fat loss"; }
+  else if (g === "Recomp (lose fat, build muscle)" && comp.catIdx >= 3) { ratePct = -0.4; phase = "Slow fat loss (recomp)"; }
   else if (g === "Build muscle") { ratePct = [0.5, 0.35, 0.25][level ?? 0]; phase = "Lean gain"; }
   else if (g === "Get stronger") { ratePct = 0.1; phase = "Maintenance to slight surplus"; }
   if (dietFatigue && ratePct < 0) { ratePct = 0; phase = "Maintenance break first"; }
@@ -1070,16 +1193,19 @@ function calc(d) {
     rateKg = kg * ratePct / 100;
     target = Math.max(bmr ? bmr : 1200, tdee + rateKg * 7700 / 7);
     const refKg = bmi && bmi >= 30 && cm ? 25 * (cm / 100) ** 2 : kg;
-    const p = Math.round(refKg * 2.0 / 5) * 5;
-    const f = Math.round(Math.max(0.6 * refKg, 0.28 * target / 9) / 5) * 5;
+    // With body fat known: protein on lean mass (2.2–2.8 g/kg LBM); otherwise on body weight
+    const p = lbm ? Math.round(lbm * 2.4 / 5) * 5 : Math.round(refKg * 2.0 / 5) * 5;
+    const f = Math.round(Math.max(0.6 * (lbm || refKg), 0.28 * target / 9) / 5) * 5;
     const c = Math.max(0, Math.round((target - p * 4 - f * 9) / 4 / 5) * 5);
-    macros = { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2) };
+    macros = lbm ? { p, f, c, pLo: Math.round(lbm * 2.2), pHi: Math.round(lbm * 2.8), basis: "lean mass" } : { p, f, c, pLo: Math.round(refKg * 1.6), pHi: Math.round(refKg * 2.2), basis: "body weight" };
+    macros.satMax = Math.round(target * 0.1 / 9);
   }
 
   const calAvg = num(d.cal_avg);
   const lowEater = !!((calAvg && bmr && calAvg < bmr * 1.3) || d.meals === "1–2" || ["0", "1"].includes(d.protein_meals) || ((d.pattern || []).includes("Skip breakfast") && d.am_appetite === "Not hungry"));
   const sb = structuralBalance(d, lifts);
   const map = mapResults(d);
+  const lip = lipidStatus(d);
 
   // Flags
   const flags = [];
@@ -1100,6 +1226,10 @@ function calc(d) {
   if (num(d.libido) != null && num(d.libido) <= 3) flags.push(["warn", `Low sex drive (${d.libido}/10). Watch recovery and energy intake; suggest blood work if it persists.`]);
   if (d.sick === "4+") flags.push(["warn", "Sick 4+ times a year. Prioritise sleep and protein; suggest blood work (including vitamin D)."]);
   map.issues.forEach(i => flags.push(["warn", "MAP: " + i]));
+  lip.flags.forEach(f => flags.push(f));
+  if (d.statin_muscle === "Yes, it bothers me") flags.push(["crit", "Statin with bothersome muscle symptoms. Client should tell their doctor before training starts; keep loads light and eccentrics short until cleared."]);
+  if ((d.meds_list || []).includes("Insulin")) flags.push(["warn", "On insulin. Ask about low blood sugar episodes; have fast carbs on hand at sessions."]);
+  if ((d.meds_list || []).includes("Blood thinner")) flags.push(["warn", "On a blood thinner. No supplements (fish oil, vitamin E, turmeric, etc.) without their doctor's OK."]);
   if (d.wake_night === "Same time most nights") flags.push(["warn", "Wakes at the same time most nights. Look at evening food, alcohol, caffeine timing and stress."]);
   if (!flags.length && Object.keys(d).length > 6) flags.push(["ok", "No medical or injury flags reported. Clear to start."]);
 
@@ -1117,8 +1247,11 @@ function calc(d) {
   if (num(d.stress) >= 7) habits.push("Stress: a 10-minute walk or breathing break daily.");
 
   const out = { blend, kg, cm, age, bmi, bmr, mult, tdeeEst, tdeeObs, obsNote, useObs, tdee, level, tier, tierName: tier != null ? TIERS[tier] : null, rawTier, taNotes, program, tech, ageIdx, strIdx,
-    lifts, recovery, split, slow, laterDays, days, phase, ratePct, rateKg, target, macros, lowEater, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
+    lifts, recovery, split, slow, laterDays, days, phase, ratePct, rateKg, target, macros, lowEater, comp, lbm, bmrMethod, lip, sb, map, flags, habits: habits.slice(0, 4), fromKg, imp };
   out.ramp = proteinRamp(d, out);
+  out.medical = medicalProtocol(d, out);
+  out.fatStart = fatLossStart(d, out);
+  out.agreement = nutritionAgreement(d, out);
   out.nutrition = nutritionProtocol(d, out);
   out.recoveryPlan = recoveryProtocol(d, out);
   out.roadmap = roadmap(d, out);
@@ -1166,6 +1299,8 @@ function renderReport() {
 
     <div class="card"><h3>Flags</h3><div class="flags">${c.flags.map(([s, t]) => `<div class="flag ${s}"><span class="pill">${s === "crit" ? "Act" : s === "warn" ? "Watch" : "Clear"}</span><span>${esc(t)}</span></div>`).join("")}</div></div>
 
+    ${bodyCompHTML(c)}
+
     <div class="rep-grid">
       <div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Training age & program type</h3>
         <div class="big">${lvlTxt}<small>${esc(data.train_age || "training age not given")}</small></div>
@@ -1195,7 +1330,9 @@ function renderReport() {
           <dt>Protein</dt><dd>${c.macros ? `${c.macros.p} g <span style="color:var(--muted)">(${c.macros.pLo}–${c.macros.pHi})</span>` : "–"}</dd>
           <dt>Fat</dt><dd>${c.macros ? c.macros.f + " g" : "–"}</dd>
           <dt>Carbs</dt><dd>${c.macros ? c.macros.c + " g" : "–"}</dd>
-          <dt>BMR</dt><dd>${c.bmr ? fmt(r50(c.bmr)) + " kcal" : "–"}</dd>
+          <dt>BMR</dt><dd>${c.bmr ? fmt(r50(c.bmr)) + " kcal · " + c.bmrMethod : "–"}</dd>
+          ${c.kg && c.comp.catIdx != null && c.comp.catIdx <= 3 ? `<dt>Cross-check 10–12 kcal/lb</dt><dd>${fmt(r50(c.kg * 2.2046 * 10))}–${fmt(r50(c.kg * 2.2046 * 12))} kcal</dd>` : ""}
+          ${c.macros ? `<dt>Protein basis</dt><dd>${c.macros.basis}</dd>` : ""}
         </dl>
         <ul class="plain"><li>Starting estimate only. Weigh daily, compare the weekly averages, and adjust calories every 1–2 weeks by the gap between expected and actual rate (≈ 7,700 kcal per kg).</li>
           ${data.diet_style && data.diet_style !== "No particular diet" ? `<li>Eating style: ${esc(data.diet_style)}${data.allergies ? "; allergies: " + esc(data.allergies) : ""}.</li>` : data.allergies ? `<li>Allergies: ${esc(data.allergies)}.</li>` : ""}</ul>
@@ -1233,6 +1370,9 @@ function renderReport() {
       </div>
     </div>
 
+    ${c.fatStart ? `<div class="card"><h3><span class="dot" style="background:var(--p-red)"></span>Fat-loss start · block 1</h3><dl class="proto">${protoHTML(c.fatStart)}</dl></div>` : ""}
+    <div class="card"><h3><span class="dot" style="background:var(--p-green)"></span>Nutrition agreement</h3><p style="margin:0;color:var(--muted);font-size:14px">Loose rules the client agrees to at the consult. Fewer rules, followed, beat a perfect plan that isn't.</p><dl class="proto">${protoHTML(c.agreement)}</dl></div>
+    ${c.medical.length ? `<div class="card"><h3><span class="dot" style="background:var(--crit)"></span>Medications & cholesterol</h3><p style="margin:0;color:var(--muted);font-size:14px">Coaching guidance only. Medical decisions stay with the client's doctor and pharmacist.</p><dl class="proto">${protoHTML(c.medical)}</dl></div>` : ""}
     <div class="card"><h3><span class="dot" style="background:var(--p-blue)"></span>Nutrition protocol</h3><dl class="proto">${protoHTML(c.nutrition)}</dl></div>
     <div class="card"><h3><span class="dot" style="background:var(--p-yellow)"></span>Recovery protocol</h3><dl class="proto">${protoHTML(c.recoveryPlan)}</dl></div>
 
@@ -1288,6 +1428,27 @@ function rampHTML(c) {
     <div style="display:flex;flex-direction:column;gap:6px;max-width:560px">${bars}</div>
     <dl class="proto">${r.actions.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
     <ul class="plain">${r.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>`;
+}
+
+function bodyCompHTML(c) {
+  const f = data.sex === "Female", u = wu(data), lu = isImp(data) ? "in" : "cm", m = c.comp;
+  const chips = BF_METHODS.map(o => `<button type="button" class="chip" data-chip="bf_method" data-multi="0" data-v="${esc(o)}" aria-pressed="${data.bf_method === o}">${esc(o)}</button>`).join("");
+  const inp = (k, label, unit, w = 90) => `<label class="unit">${label} <input type="number" inputmode="decimal" step="0.5" data-f="${k}" data-rerender="1" id="f-${k}" value="${esc(data[k])}" style="max-width:${w}px"> ${unit}</label>`;
+  const jp = data.bf_method === BF_METHODS[0];
+  const sites = jp ? `<div style="display:flex;flex-wrap:wrap;gap:10px 18px">${(f ? [["bf_tri", "Triceps"], ["bf_supra", "Suprailiac"], ["bf_thigh", "Thigh"]] : [["bf_chest", "Chest"], ["bf_abd", "Abdomen"], ["bf_thigh", "Thigh"]]).map(([k, l]) => inp(k, l, "mm")).join("")}</div>` : "";
+  const res = m.bf != null ? `<dl class="kv">
+      <dt>Body fat</dt><dd>${m.bf}%${m.sum ? ` (sum ${m.sum} mm)` : ""}</dd>
+      <dt>Category</dt><dd>${m.cat}</dd>
+      <dt>Fat mass · lean mass</dt><dd>${fmt(c.fromKg(m.fatKg), 1)} · ${fmt(c.fromKg(m.lean), 1)} ${u}</dd>
+      ${m.goalKg ? `<dt>At ${m.target}% body fat${m.targetIsDefault ? " (suggested)" : ""}</dt><dd>${fmt(c.fromKg(m.goalKg))} ${u} (−${fmt(num(data.wt) - c.fromKg(m.goalKg))} ${u})</dd>` : ""}
+      ${m.whtr ? `<dt>Waist ÷ height</dt><dd>${m.whtr.toFixed(2)} ${m.whtr >= 0.5 ? '<span class="tag warn">above 0.5</span>' : '<span class="tag ok">under 0.5</span>'}</dd>` : ""}
+    </dl>` : '<p class="note" style="margin:0">Enter body fat to switch BMR to lean mass, set protein on lean mass, pick the fat-loss rate and estimate a goal weight.</p>';
+  return `<div class="card" id="compCard"><h3><span class="dot" style="background:var(--p-yellow)"></span>Body composition</h3>
+    <div class="chips" data-rerender="1">${chips}</div>
+    ${sites}
+    <div style="display:flex;flex-wrap:wrap;gap:10px 18px">${jp ? "" : inp("bf_pct", "Body fat", "%")}${inp("waist", "Waist (at navel)", lu)}${inp("bf_target", "Target body fat", "%")}</div>
+    ${res}
+    <p style="margin:0;color:var(--muted);font-size:13px">Use the same method, time of day and tester each time; the trend matters more than the number. Ranges (ACE): men 6–13% athletic, 14–17% fitness, 18–24% average, 25%+ obese; women 14–20%, 21–24%, 25–31%, 32%+.</p></div>`;
 }
 
 function protoHTML(rows) {
@@ -1392,6 +1553,10 @@ function reportText() {
     `- Expenditure: ${c.tdee ? fmt(r50(c.tdee)) + " kcal" : "–"} (${c.blend === 1 ? "from intake + weight trend" : c.blend ? "blend of intake + trend and equation" : "equation estimate"})`,
     `- Rate: ${c.rateKg ? fmt(c.fromKg(c.rateKg), 2) + " " + u + "/week" : "maintain"}`,
     `- Protein ${c.macros ? c.macros.p : "–"} g · Fat ${c.macros ? c.macros.f : "–"} g · Carbs ${c.macros ? c.macros.c : "–"} g`);
+  if (c.comp.bf != null) L.push("", "BODY COMPOSITION", `- ${c.comp.bf}% body fat (${data.bf_method || "method not set"}) · ${c.comp.cat} · lean mass ${fmt(c.fromKg(c.comp.lean), 1)} ${u}${c.comp.goalKg ? ` · at ${c.comp.target}%: ${fmt(c.fromKg(c.comp.goalKg))} ${u}` : ""}${c.comp.whtr ? ` · waist/height ${c.comp.whtr.toFixed(2)}` : ""}`);
+  if (c.fatStart) { L.push("", "FAT-LOSS START"); c.fatStart.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`)); }
+  L.push("", "NUTRITION AGREEMENT"); c.agreement.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`));
+  if (c.medical.length) { L.push("", "MEDICATIONS & CHOLESTEROL (coaching guidance; medical decisions stay with the doctor)"); c.medical.forEach(([k, a, b]) => L.push(`- ${k}: ${a} (${b})`)); }
   L.push("", "BUILDING BLOCKS (block 1, 4-week stages)"); BUILDING_BLOCKS.forEach(b => { const why = blockPriority(b, c); L.push(`- ${b.area}${why.length ? " [PRIORITY: " + why.join(", ") + "]" : ""}: ${b.stages.join(" → ")}`); });
   if (c.ramp && !c.ramp.ok) { L.push("", `PROTEIN RAMP-UP: ${c.ramp.current} → ${c.ramp.target} g/day`, "- " + c.ramp.steps.map(s => `${s.weeks}: ${s.g} g`).join(" · ")); c.ramp.actions.forEach(([k, v]) => L.push(`- ${k}: ${v}`)); c.ramp.tips.forEach(t => L.push("- " + t)); }
   L.push("", "NUTRITION PROTOCOL"); c.nutrition.forEach(([k, a, b]) => L.push(`- ${k}: ${a}${b ? " (" + b + ")" : ""}`));
@@ -1479,6 +1644,9 @@ const EXAMPLE = {
   barriers: ["Time", "Family commitments", "Night eating"], streak: "1+ year", support: "Very supportive", checkin: "Weekly check-in", coach_style: "Explain the why",
   will_track: ["Daily morning weight", "Food (calories / macros)", "Training log", "Progress photos"],
   sb_cgb_w: "175", sb_cgb_r: "3", sb_incline_w: "155", sb_incline_r: "3", sb_dip_w: "45", sb_dip_r: "5", sb_chin_w: "25", sb_chin_r: "3", sb_dbpress_w: "50", sb_triext_w: "75", sb_triext_r: "6", sb_er_w: "12", sb_bsq_w: "255", sb_bsq_r: "3", sb_fsq_w: "185", sb_fsq_r: "3", sb_dl_w: "315", sb_dl_r: "3",
+  bf_method: "Skinfold: Jackson-Pollock 3-site", bf_chest: "18", bf_abd: "30", bf_thigh: "20", waist: "37", bf_target: "15",
+  lipid_units: "mmol/L", ldl: "3.8", hdl: "1.1", tg: "2.1", meds_list: ["None"],
+  habit_pick: ["Protein at every meal", "Stop eating 2–3 h before bed"], habit_conf: "8",
   protein_meals: "1", am_appetite: "Not hungry", shakes: "Yes", nut_pref: "Track calories & macros", first_meal: "10 am–noon", last_meal: "9–11 pm", hunger: "6", eat_speed: "Under 10 min",
   protein_src: ["Meat", "Poultry", "Eggs", "Protein powder"], veg: "2–3", fruit: "1–2", fish: "None", train_time: "4–7 pm", pre_wo: "Have a small snack",
   trigger_foods: ["Dairy"], weekend: "Very different",
